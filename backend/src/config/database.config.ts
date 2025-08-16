@@ -8,7 +8,7 @@ export const databaseConfig: TypeOrmModuleOptions = {
   password: process.env.DB_PASSWORD || 'admin123',
   database: process.env.DB_NAME || 'user_contacts',
   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-  synchronize: process.env.NODE_ENV === 'development', // Only in development
+  synchronize: false, // Disable synchronize to use migrations
   logging: process.env.NODE_ENV === 'development',
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
 };
