@@ -14,3 +14,6 @@ export * from './middleware/logger.middleware';
 
 // Constants
 export * from './constants';
+
+// Routes
+export * from './routes';
