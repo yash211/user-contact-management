@@ -16,22 +16,7 @@ export class Contact {
   phone: string;
 
   @Column({ type: 'varchar', length: 500, nullable: true })
-  address: string;
-
-  @Column({ type: 'varchar', length: 100, nullable: true })
-  company: string;
-
-  @Column({ type: 'varchar', length: 100, nullable: true })
-  position: string;
-
-  @Column({ type: 'text', nullable: true })
-  notes: string;
-
-  @Column({ type: 'varchar', length: 500, nullable: true })
   photo: string;
-
-  @Column({ type: 'boolean', default: true })
-  isActive: boolean;
 
   @Column({ type: 'uuid' })
   userId: string;

@@ -3,6 +3,12 @@ export const MESSAGES = {
   SUCCESS: {
     USER_REGISTERED: 'User registered successfully',
     USER_LOGGED_IN: 'User logged in successfully',
+    CONTACT_CREATED: 'Contact created successfully',
+    CONTACT_RETRIEVED: 'Contact retrieved successfully',
+    CONTACTS_RETRIEVED: 'Contacts retrieved successfully',
+    CONTACT_UPDATED: 'Contact updated successfully',
+    CONTACT_DELETED: 'Contact deleted successfully',
+    CONTACTS_SEARCHED: 'Search results retrieved successfully',
   },
   ERROR: {
     INVALID_CREDENTIALS: 'Invalid email or password',
