@@ -3,8 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import { Contact } from '../common/entities/contact.entity';
 import { CreateContactDto, UpdateContactDto } from '../common/dto/contact.dto';
+import { UserRole } from '../common/entities/user.entity';
 
-// pagination options interface
 export interface ContactPaginationOptions {
   page: number;
   limit: number;
@@ -13,7 +13,6 @@ export interface ContactPaginationOptions {
   sortOrder?: 'ASC' | 'DESC';
 }
 
-// pagination response interface
 export interface PaginatedContactsResponse {
   contacts: Contact[];
   pagination: {
@@ -33,32 +32,30 @@ export class ContactsService {
     private readonly contactRepository: Repository<Contact>,
   ) {}
 
-  // create new contact
-  async createContact(createContactDto: CreateContactDto, userId: string): Promise<Contact> {
+  async createContact(createContactDto: CreateContactDto, userId: string, targetUserId?: string): Promise<Contact> {
+    const contactUserId = targetUserId || userId;
     const contact = this.contactRepository.create({
       ...createContactDto,
-      userId,
+      userId: contactUserId,
     });
     return await this.contactRepository.save(contact);
   }
 
-  // get all contacts with pagination, search, and sorting
   async findAllContacts(
     userId: string,
     options: ContactPaginationOptions,
+    targetUserId?: string,
   ): Promise<PaginatedContactsResponse> {
     const { page = 1, limit = 10, search, sortBy = 'createdAt', sortOrder = 'DESC' } = options;
     
-    // validate pagination parameters
     if (page < 1) throw new BadRequestException('Page must be greater than 0');
     if (limit < 1 || limit > 100) throw new BadRequestException('Limit must be between 1 and 100');
 
-    // build query
+    const queryUserId = targetUserId || userId;
     let queryBuilder: SelectQueryBuilder<Contact> = this.contactRepository
       .createQueryBuilder('contact')
-      .where('contact.userId = :userId', { userId });
+      .where('contact.userId = :userId', { userId: queryUserId });
 
-    // add search if provided
     if (search) {
       queryBuilder = queryBuilder.andWhere(
         '(contact.name ILIKE :search OR contact.email ILIKE :search OR contact.phone ILIKE :search)',
@@ -66,7 +63,6 @@ export class ContactsService {
       );
     }
 
-    // add sorting
     const allowedSortFields = ['name', 'email', 'phone', 'createdAt', 'updatedAt'];
     if (allowedSortFields.includes(sortBy)) {
       queryBuilder = queryBuilder.orderBy(`contact.${sortBy}`, sortOrder);
@@ -74,17 +70,13 @@ export class ContactsService {
       queryBuilder = queryBuilder.orderBy('contact.createdAt', 'DESC');
     }
 
-    // get total count
     const total = await queryBuilder.getCount();
 
-    // apply pagination
     const skip = (page - 1) * limit;
     queryBuilder = queryBuilder.skip(skip).take(limit);
 
-    // execute query
     const contacts = await queryBuilder.getMany();
 
-    // calculate pagination metadata
     const totalPages = Math.ceil(total / limit);
     const hasNext = page < totalPages;
     const hasPrev = page > 1;
@@ -102,10 +94,9 @@ export class ContactsService {
     };
   }
 
-  // find contact by ID and ensure ownership
-  async findContactById(id: string, userId: string): Promise<Contact> {
+  async findContactById(id: string, userId: string, targetUserId?: string): Promise<Contact> {
     const contact = await this.contactRepository.findOne({
-      where: { id, userId },
+      where: { id, userId: targetUserId || userId },
     });
 
     if (!contact) {
@@ -115,21 +106,72 @@ export class ContactsService {
     return contact;
   }
 
-  // update contact
   async updateContact(
     id: string,
     updateContactDto: UpdateContactDto,
     userId: string,
+    targetUserId?: string,
   ): Promise<Contact> {
-    const contact = await this.findContactById(id, userId);
+    const contact = await this.findContactById(id, userId, targetUserId);
     
     Object.assign(contact, updateContactDto);
     return await this.contactRepository.save(contact);
   }
 
-  // delete contact permanently
-  async deleteContact(id: string, userId: string): Promise<void> {
-    const contact = await this.findContactById(id, userId);
+  async deleteContact(id: string, userId: string, targetUserId?: string): Promise<void> {
+    const contact = await this.findContactById(id, userId, targetUserId);
     await this.contactRepository.remove(contact);
+  }
+
+  // admin can see all contacts across users
+  async findAllContactsForAdmin(
+    options: ContactPaginationOptions,
+  ): Promise<PaginatedContactsResponse> {
+    const { page = 1, limit = 10, search, sortBy = 'createdAt', sortOrder = 'DESC' } = options;
+    
+    if (page < 1) throw new BadRequestException('Page must be greater than 0');
+    if (limit < 1 || limit > 100) throw new BadRequestException('Limit must be between 1 and 100');
+
+    let queryBuilder: SelectQueryBuilder<Contact> = this.contactRepository
+      .createQueryBuilder('contact')
+      .leftJoinAndSelect('contact.user', 'user')
+      .addSelect(['user.id', 'user.name', 'user.email']);
+
+    if (search) {
+      queryBuilder = queryBuilder.andWhere(
+        '(contact.name ILIKE :search OR contact.email ILIKE :search OR contact.phone ILIKE :search OR user.name ILIKE :search OR user.email ILIKE :search)',
+        { search: `%${search}%` }
+      );
+    }
+
+    const allowedSortFields = ['name', 'email', 'phone', 'createdAt', 'updatedAt'];
+    if (allowedSortFields.includes(sortBy)) {
+      queryBuilder = queryBuilder.orderBy(`contact.${sortBy}`, sortOrder);
+    } else {
+      queryBuilder = queryBuilder.orderBy('contact.createdAt', 'DESC');
+    }
+
+    const total = await queryBuilder.getCount();
+
+    const skip = (page - 1) * limit;
+    queryBuilder = queryBuilder.skip(skip).take(limit);
+
+    const contacts = await queryBuilder.getMany();
+
+    const totalPages = Math.ceil(total / limit);
+    const hasNext = page < totalPages;
+    const hasPrev = page > 1;
+
+    return {
+      contacts,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNext,
+        hasPrev,
+      },
+    };
   }
 }

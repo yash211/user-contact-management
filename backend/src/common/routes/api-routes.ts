@@ -19,6 +19,7 @@ export const API_ROUTES = {
     GET_BY_ID: '/:id',
     UPDATE: '/:id',
     DELETE: '/:id',
+    ADMIN_ALL: '/admin/all',
   },
 } as const;
 
