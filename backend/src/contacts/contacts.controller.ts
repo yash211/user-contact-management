@@ -2,7 +2,10 @@ import {
   Controller,
   Get,
   Post,
+  Put,
+  Delete,
   Body,
+  Param,
   Query,
   UseGuards,
   Request,
@@ -16,11 +19,13 @@ import {
   ApiResponse,
   ApiBearerAuth,
   ApiBody,
+  ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
 import { ContactsService, ContactPaginationOptions } from './contacts.service';
 import {
   CreateContactDto,
+  UpdateContactDto,
   ContactPaginationDto,
 } from '../common/dto/contact.dto';
 import { JwtAuthGuard } from '../auth/guards';
@@ -34,6 +39,7 @@ import { SuccessResponseDto, ErrorResponseDto } from '../common/dto/response.dto
 export class ContactsController {
   constructor(private readonly contactsService: ContactsService) {}
 
+  // create new contact
   @Post(API_ROUTES.CONTACTS.CREATE)
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a new contact' })
@@ -97,6 +103,7 @@ export class ContactsController {
     }
   }
 
+  // get all contacts with pagination, search, and sorting
   @Get(API_ROUTES.CONTACTS.GET_ALL)
   @ApiOperation({ summary: 'Get all contacts with pagination, search, and sorting' })
   @ApiQuery({ name: 'page', required: false, description: 'Page number (default: 1)' })
@@ -183,11 +190,163 @@ export class ContactsController {
     }
   }
 
+  // get contact by ID
+  @Get(API_ROUTES.CONTACTS.GET_BY_ID)
+  @ApiOperation({ summary: 'Get a specific contact by ID' })
+  @ApiParam({ name: 'id', description: 'Contact ID (UUID)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Contact retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Contact retrieved successfully' },
+        data: {
+          type: 'object',
+          properties: {
+            contact: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', example: 'uuid-here' },
+                name: { type: 'string', example: 'John Doe' },
+                email: { type: 'string', example: 'john@example.com' },
+                phone: { type: 'string', example: '+1234567890' },
+                photo: { type: 'string', example: 'https://example.com/photo.jpg' },
+                createdAt: { type: 'string', example: '2024-01-01T00:00:00.000Z' },
+                updatedAt: { type: 'string', example: '2024-01-01T00:00:00.000Z' },
+              },
+            },
+          },
+        },
+        timestamp: { type: 'string', example: '2024-01-01T00:00:00.000Z' },
+        path: { type: 'string', example: '/contacts/uuid-here' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Contact not found',
+    type: ErrorResponseDto,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - invalid or missing token',
+    type: ErrorResponseDto,
+  })
+  async getContactById(@Param('id') id: string, @Request() req) {
+    try {
+      const contact = await this.contactsService.findContactById(id, req.user.id);
+      return ResponseBuilder.success(
+        { contact },
+        MESSAGES.SUCCESS.CONTACT_RETRIEVED || 'Contact retrieved successfully',
+        `${API_ROUTES.CONTACTS.BASE}/${id}`,
+      );
+    } catch (error) {
+      throw error;
+    }
+  }
 
+  // update contact
+  @Put(API_ROUTES.CONTACTS.UPDATE)
+  @ApiOperation({ summary: 'Update a specific contact' })
+  @ApiParam({ name: 'id', description: 'Contact ID (UUID)' })
+  @ApiBody({ type: UpdateContactDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Contact updated successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'Contact updated successfully' },
+        data: {
+          type: 'object',
+          properties: {
+            contact: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', example: 'uuid-here' },
+                name: { type: 'string', example: 'John Doe' },
+                email: { type: 'string', example: 'john@example.com' },
+                phone: { type: 'string', example: '+1234567890' },
+                photo: { type: 'string', example: 'https://example.com/photo.jpg' },
+                createdAt: { type: 'string', example: '2024-01-01T00:00:00.000Z' },
+                updatedAt: { type: 'string', example: '2024-01-01T00:00:00.000Z' },
+              },
+            },
+          },
+        },
+        timestamp: { type: 'string', example: '2024-01-01T00:00:00.000Z' },
+        path: { type: 'string', example: '/contacts/uuid-here' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - validation failed',
+    type: ErrorResponseDto,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Contact not found',
+    type: ErrorResponseDto,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - invalid or missing token',
+    type: ErrorResponseDto,
+  })
+  async updateContact(
+    @Param('id') id: string,
+    @Body(ValidationPipe) updateContactDto: UpdateContactDto,
+    @Request() req,
+  ) {
+    try {
+      const contact = await this.contactsService.updateContact(
+        id,
+        updateContactDto,
+        req.user.id,
+      );
+      return ResponseBuilder.success(
+        { contact },
+        MESSAGES.SUCCESS.CONTACT_UPDATED || 'Contact updated successfully',
+        `${API_ROUTES.CONTACTS.BASE}/${id}`,
+      );
+    } catch (error) {
+      throw error;
+    }
+  }
 
-
-
-
-
-
+  // delete contact
+  @Delete(API_ROUTES.CONTACTS.DELETE)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a specific contact' })
+  @ApiParam({ name: 'id', description: 'Contact ID (UUID)' })
+  @ApiResponse({
+    status: 204,
+    description: 'Contact deleted successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Contact not found',
+    type: ErrorResponseDto,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - invalid or missing token',
+    type: ErrorResponseDto,
+  })
+  async deleteContact(@Param('id') id: string, @Request() req) {
+    try {
+      await this.contactsService.deleteContact(id, req.user.id);
+      return ResponseBuilder.success(
+        null,
+        MESSAGES.SUCCESS.CONTACT_DELETED || 'Contact deleted successfully',
+        `${API_ROUTES.CONTACTS.BASE}/${id}`,
+      );
+    } catch (error) {
+      throw error;
+    }
+  }
 }
