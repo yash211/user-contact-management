@@ -1,3 +1,4 @@
+// Standard API response structure
 export interface ApiResponse<T = any> {
   success: boolean;
   message: string;
@@ -7,47 +8,38 @@ export interface ApiResponse<T = any> {
   path: string;
 }
 
-export interface PaginatedResponse<T> extends ApiResponse<T[]> {
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
+// Error response structure
+export interface ErrorResponse {
+  success: false;
+  message: string;
+  error: string;
+  statusCode: number;
+  timestamp: string;
+  path: string;
+  details?: any;
 }
 
-export class ApiResponseBuilder<T> {
-  private response: Partial<ApiResponse<T>> = {
-    success: true,
-    timestamp: new Date().toISOString(),
-  };
-
-  success(success: boolean): ApiResponseBuilder<T> {
-    this.response.success = success;
-    return this;
+// Response builder for consistent API responses
+export class ResponseBuilder {
+  static success<T>(data: T, message: string, path: string): ApiResponse<T> {
+    return {
+      success: true,
+      message,
+      data,
+      timestamp: new Date().toISOString(),
+      path,
+    };
   }
 
-  message(message: string): ApiResponseBuilder<T> {
-    this.response.message = message;
-    return this;
-  }
-
-  data(data: T): ApiResponseBuilder<T> {
-    this.response.data = data;
-    return this;
-  }
-
-  error(error: string): ApiResponseBuilder<T> {
-    this.response.error = error;
-    return this;
-  }
-
-  path(path: string): ApiResponseBuilder<T> {
-    this.response.path = path;
-    return this;
-  }
-
-  build(): ApiResponse<T> {
-    return this.response as ApiResponse<T>;
+  static error(message: string, error: string, statusCode: number, path: string, details?: any): ErrorResponse {
+    return {
+      success: false,
+      message,
+      error,
+      statusCode,
+      timestamp: new Date().toISOString(),
+      path,
+      details,
+    };
   }
 }

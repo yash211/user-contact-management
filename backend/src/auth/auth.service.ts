@@ -2,7 +2,7 @@ import { Injectable, ConflictException, UnauthorizedException, NotFoundException
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
-import { User, UserRole, MESSAGES, APP_CONSTANTS } from '../common';
+import { User, UserRole, MESSAGES, APP_CONSTANTS, ResponseBuilder } from '../common';
 import { RegisterDto, LoginDto } from '../common';
 
 export interface JwtPayload {

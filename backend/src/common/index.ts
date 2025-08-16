@@ -3,8 +3,7 @@ export * from './entities/user.entity';
 export * from './entities/contact.entity';
 
 // DTOs
-export * from './dto/auth.dto';
-export * from './dto/contact.dto';
+export * from './dto';
 
 // Interfaces
 export * from './interfaces/api-response.interface';
@@ -17,3 +16,6 @@ export * from './constants';
 
 // Routes
 export * from './routes';
+
+// Filters
+export * from './filters';
