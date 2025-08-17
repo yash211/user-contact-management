@@ -4,6 +4,7 @@ export const API_ROUTES = {
     BASE: '/auth',
     REGISTER: '/register',
     LOGIN: '/login',
+    LOGOUT: '/logout',
     PROFILE: '/profile',
     ADMIN_USERS: '/admin/users',
   },

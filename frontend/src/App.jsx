@@ -1,11 +1,31 @@
+import React from 'react';
+import { Provider } from 'react-redux';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { store } from './store';
+import { AuthPage, Dashboard, ProtectedRoute } from './components';
+import './App.css';
+
 function App() {
   return (
-    <div className="flex items-center justify-center h-screen bg-gray-100">
-      <h1 className="text-4xl font-bold text-red-600">
-        Hello React + Tailwind + Vite 🚀
-      </h1>
-    </div>
-  )
+    <Provider store={store}>
+      <Router>
+        <div className="App">
+          <Routes>
+            <Route path="/auth" element={<AuthPage />} />
+            <Route 
+              path="/dashboard" 
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route path="/" element={<Navigate to="/auth" replace />} />
+          </Routes>
+        </div>
+      </Router>
+    </Provider>
+  );
 }
 
 export default App;
