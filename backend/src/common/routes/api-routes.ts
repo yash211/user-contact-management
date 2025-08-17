@@ -20,6 +20,7 @@ export const API_ROUTES = {
     UPDATE: '/:id',
     DELETE: '/:id',
     ADMIN_ALL: '/admin/all',
+    EXPORT_CSV: '/export/csv',
   },
 } as const;
 

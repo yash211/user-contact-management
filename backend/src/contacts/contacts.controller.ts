@@ -18,7 +18,9 @@ import {
   ParseFilePipe,
   MaxFileSizeValidator,
   FileTypeValidator,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -619,6 +621,62 @@ export class ContactsController {
         MESSAGES.SUCCESS.CONTACT_DELETED || 'Contact deleted successfully',
         `${API_ROUTES.CONTACTS.BASE}/${id}`,
       );
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  @Get(API_ROUTES.CONTACTS.EXPORT_CSV)
+  @ApiOperation({ summary: 'Export contacts to CSV format' })
+  @ApiQuery({ name: 'userId', required: false, description: 'Target user ID (admin only)' })
+  @ApiResponse({
+    status: 200,
+    description: 'CSV file generated successfully',
+    schema: {
+      type: 'string',
+      format: 'binary',
+    },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - invalid or missing token',
+    type: ErrorResponseDto,
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - admin access required for other users',
+    type: ErrorResponseDto,
+  })
+  async exportContactsToCsv(
+    @Request() req,
+    @Res() res: Response,
+    @Query('userId') targetUserId?: string,
+  ) {
+    try {
+      const isAdmin = req.user.role === UserRole.ADMIN;
+      
+      if (targetUserId && !isAdmin) {
+        throw new ForbiddenException('Only admins can export other users\' contacts');
+      }
+
+      let filename: string;
+      
+      if (isAdmin && !targetUserId) {
+        filename = await this.contactsService.exportAllContactsToCsv();
+      } else {
+        filename = await this.contactsService.exportContactsToCsv(req.user.id, targetUserId);
+      }
+
+      const filePath = `./uploads/exports/${filename}`;
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      
+      return res.download(filePath, filename, (err) => {
+        if (err) {
+          console.error('Error downloading file:', err);
+        }
+      });
     } catch (error) {
       throw error;
     }
