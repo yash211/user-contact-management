@@ -1,12 +1,30 @@
 import React from 'react';
-import { AuthPage } from './components';
+import { Provider } from 'react-redux';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { store } from './store';
+import { AuthPage, Dashboard, ProtectedRoute } from './components';
 import './App.css';
 
 function App() {
   return (
-    <div className="App">
-      <AuthPage />
-    </div>
+    <Provider store={store}>
+      <Router>
+        <div className="App">
+          <Routes>
+            <Route path="/auth" element={<AuthPage />} />
+            <Route 
+              path="/dashboard" 
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route path="/" element={<Navigate to="/auth" replace />} />
+          </Routes>
+        </div>
+      </Router>
+    </Provider>
   );
 }
 

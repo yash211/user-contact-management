@@ -191,6 +191,37 @@ export class AuthController {
     }
   }
 
+  @Post('/logout')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'User logout' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Logout successful',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: { type: 'string', example: 'User logged out successfully' },
+        data: { type: 'object' },
+        timestamp: { type: 'string', example: '2024-01-01T00:00:00.000Z' },
+        path: { type: 'string', example: '/auth/logout' }
+      }
+    }
+  })
+  async logout() {
+    try {
+      // For JWT-based auth, logout is handled client-side by removing the token
+      // This endpoint can be used for additional cleanup if needed
+      return ResponseBuilder.success(
+        {},
+        'User logged out successfully',
+        '/auth/logout'
+      );
+    } catch (error) {
+      throw error;
+    }
+  }
+
   @Get(API_ROUTES.AUTH.PROFILE)
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
