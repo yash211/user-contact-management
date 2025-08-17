@@ -5,7 +5,7 @@ import { ApiProperty } from '@nestjs/swagger';
 export class CreateContactDto {
   @ApiProperty({
     description: 'Contact name (required)',
-    example: 'John Doe',
+    example: 'Yash Gupta',
     minLength: 2,
     maxLength: 100,
   })

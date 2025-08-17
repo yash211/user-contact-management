@@ -31,7 +31,7 @@ export class BaseResponseDto {
 export class SuccessResponseDto<T = any> extends BaseResponseDto {
   @ApiProperty({
     description: 'The actual data returned by the operation',
-    example: { id: 'uuid', name: 'John Doe' },
+    example: { id: 'uuid', name: 'Yash Gupta' },
   })
   data: T;
 }
