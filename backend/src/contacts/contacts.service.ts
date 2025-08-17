@@ -4,6 +4,7 @@ import { Repository, SelectQueryBuilder } from 'typeorm';
 import { Contact } from '../common/entities/contact.entity';
 import { CreateContactDto, UpdateContactDto } from '../common/dto/contact.dto';
 import { UserRole } from '../common/entities/user.entity';
+import * as createCsvWriter from 'csv-writer';
 
 export interface ContactPaginationOptions {
   page: number;
@@ -173,5 +174,86 @@ export class ContactsService {
         hasPrev,
       },
     };
+  }
+
+  async exportContactsToCsv(userId: string, targetUserId?: string): Promise<string> {
+    let queryBuilder: SelectQueryBuilder<Contact> = this.contactRepository
+      .createQueryBuilder('contact')
+      .leftJoinAndSelect('contact.user', 'user')
+      .addSelect(['user.id', 'user.name', 'user.email'])
+      .orderBy('contact.createdAt', 'DESC');
+
+    if (targetUserId) {
+      queryBuilder = queryBuilder.where('contact.userId = :userId', { userId: targetUserId });
+    } else {
+      queryBuilder = queryBuilder.where('contact.userId = :userId', { userId });
+    }
+
+    const contacts = await queryBuilder.getMany();
+
+    const csvWriter = createCsvWriter.createObjectCsvWriter({
+      path: `./uploads/exports/contacts_${Date.now()}.csv`,
+      header: [
+        { id: 'name', title: 'Name' },
+        { id: 'email', title: 'Email' },
+        { id: 'phone', title: 'Phone' },
+        { id: 'userName', title: 'User Name' },
+        { id: 'userEmail', title: 'User Email' },
+        { id: 'createdAt', title: 'Created At' },
+        { id: 'updatedAt', title: 'Updated At' },
+      ],
+    });
+
+    const records = contacts.map(contact => ({
+      name: contact.name,
+      email: contact.email || '',
+      phone: contact.phone || '',
+      userName: contact.user?.name || '',
+      userEmail: contact.user?.email || '',
+      createdAt: contact.createdAt.toISOString(),
+      updatedAt: contact.updatedAt.toISOString(),
+    }));
+
+    await csvWriter.writeRecords(records);
+    
+    const filename = `contacts_${Date.now()}.csv`;
+    return filename;
+  }
+
+  async exportAllContactsToCsv(): Promise<string> {
+    const contacts = await this.contactRepository
+      .createQueryBuilder('contact')
+      .leftJoinAndSelect('contact.user', 'user')
+      .addSelect(['user.id', 'user.name', 'user.email'])
+      .orderBy('contact.createdAt', 'DESC')
+      .getMany();
+
+    const csvWriter = createCsvWriter.createObjectCsvWriter({
+      path: `./uploads/exports/all_contacts_${Date.now()}.csv`,
+      header: [
+        { id: 'name', title: 'Name' },
+        { id: 'email', title: 'Email' },
+        { id: 'phone', title: 'Phone' },
+        { id: 'userName', title: 'User Name' },
+        { id: 'userEmail', title: 'User Email' },
+        { id: 'createdAt', title: 'Created At' },
+        { id: 'updatedAt', title: 'Updated At' },
+      ],
+    });
+
+    const records = contacts.map(contact => ({
+      name: contact.name,
+      email: contact.email || '',
+      phone: contact.phone || '',
+      userName: contact.user?.name || '',
+      userEmail: contact.user?.email || '',
+      createdAt: contact.createdAt.toISOString(),
+      updatedAt: contact.updatedAt.toISOString(),
+    }));
+
+    await csvWriter.writeRecords(records);
+    
+    const filename = `all_contacts_${Date.now()}.csv`;
+    return filename;
   }
 }
