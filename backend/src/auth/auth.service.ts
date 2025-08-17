@@ -2,7 +2,9 @@ import { Injectable, ConflictException, UnauthorizedException, NotFoundException
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
-import { User, UserRole, MESSAGES, APP_CONSTANTS, ResponseBuilder } from '../common';
+import { User, UserRole } from '../common/entities';
+import { MESSAGES, APP_CONSTANTS } from '../common';
+import { ResponseBuilder } from '../common/interfaces';
 import { RegisterDto, LoginDto } from '../common';
 
 export interface JwtPayload {
@@ -120,6 +122,42 @@ export class AuthService {
         throw error;
       }
       throw new BadRequestException('Failed to find user');
+    }
+  }
+
+  async findUserById(id: string): Promise<User> {
+    return this.findById(id);
+  }
+
+  async updateUserPhoto(userId: string, photoUrl: string | null): Promise<User> {
+    try {
+      const user = await this.findById(userId);
+      user.photo = photoUrl;
+      return await this.userRepository.save(user);
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to update user photo');
+    }
+  }
+
+  async updateUserProfile(userId: string, updateData: Partial<User>): Promise<User> {
+    try {
+      const user = await this.findById(userId);
+      
+      // Update allowed fields
+      if (updateData.name !== undefined) user.name = updateData.name;
+      if (updateData.email !== undefined) user.email = updateData.email;
+      if (updateData.phone !== undefined) user.phone = updateData.phone;
+      if (updateData.photo !== undefined) user.photo = updateData.photo;
+      
+      return await this.userRepository.save(user);
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      throw new BadRequestException('Failed to update user profile');
     }
   }
 

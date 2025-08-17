@@ -16,7 +16,7 @@ export class Contact {
   phone: string;
 
   @Column({ type: 'varchar', length: 500, nullable: true })
-  photo: string;
+  photo: string | null;
 
   @Column({ type: 'uuid' })
   userId: string;

@@ -6,7 +6,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies';
-import { User } from '../common';
+import { User } from '../common/entities';
+import { FileUploadModule } from '../common/file-upload';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { User } from '../common';
       }),
       inject: [ConfigService],
     }),
+    FileUploadModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

@@ -13,6 +13,11 @@ import {
   HttpStatus,
   ValidationPipe,
   ForbiddenException,
+  UseInterceptors,
+  UploadedFile,
+  ParseFilePipe,
+  MaxFileSizeValidator,
+  FileTypeValidator,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -22,7 +27,9 @@ import {
   ApiBody,
   ApiParam,
   ApiQuery,
+  ApiConsumes,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ContactsService, ContactPaginationOptions } from './contacts.service';
 import {
   CreateContactDto,
@@ -30,21 +37,45 @@ import {
   ContactPaginationDto,
 } from '../common/dto/contact.dto';
 import { JwtAuthGuard } from '../auth/guards';
-import { API_TAGS, API_ROUTES, ResponseBuilder, MESSAGES } from '../common';
+import { API_TAGS, API_ROUTES, MESSAGES } from '../common';
+import { UserRole } from '../common/entities';
+import { ResponseBuilder } from '../common/interfaces';
+import { FileUploadService } from '../common/file-upload';
+import type { UploadedFile as UploadedFileType } from '../common/file-upload';
 import { SuccessResponseDto, ErrorResponseDto } from '../common/dto/response.dto';
-import { UserRole } from '../common/entities/user.entity';
 
 @ApiTags(API_TAGS.CONTACTS)
 @Controller(API_ROUTES.CONTACTS.BASE)
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class ContactsController {
-  constructor(private readonly contactsService: ContactsService) {}
+  constructor(
+    private readonly contactsService: ContactsService,
+    private readonly fileUploadService: FileUploadService,
+  ) {}
 
   @Post(API_ROUTES.CONTACTS.CREATE)
+  @UseInterceptors(FileInterceptor('photo', { storage: undefined }))
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a new contact' })
+  @ApiOperation({ summary: 'Create a new contact with optional photo' })
   @ApiQuery({ name: 'userId', required: false, description: 'Target user ID (admin only)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', example: 'Yash Gupta' },
+        email: { type: 'string', example: 'john@example.com' },
+        phone: { type: 'string', example: '+1234567890' },
+        photo: {
+          type: 'string',
+          format: 'binary',
+          description: 'Contact photo file (JPEG, PNG, GIF, WebP)',
+        },
+      },
+      required: ['name'],
+    },
+  })
   @ApiResponse({
     status: 201,
     description: 'Contact created successfully',
@@ -61,9 +92,9 @@ export class ContactsController {
               properties: {
                 id: { type: 'string', example: 'uuid-here' },
                 name: { type: 'string', example: 'Yash Gupta' },
-                email: { type: 'string', example: 'Yash@example.com' },
+                email: { type: 'string', example: 'john@example.com' },
                 phone: { type: 'string', example: '+1234567890' },
-                photo: { type: 'string', example: 'https://example.com/photo.jpg' },
+                photo: { type: 'string', example: '/uploads/contacts/filename.jpg' },
                 createdAt: { type: 'string', example: '2024-01-01T00:00:00.000Z' },
                 updatedAt: { type: 'string', example: '2024-01-01T00:00:00.000Z' },
               },
@@ -85,27 +116,55 @@ export class ContactsController {
     description: 'Unauthorized - invalid or missing token',
     type: ErrorResponseDto,
   })
-  @ApiBody({ type: CreateContactDto })
   async createContact(
     @Body(ValidationPipe) createContactDto: CreateContactDto,
-    @Request() req,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
+          new FileTypeValidator({ fileType: '.(jpg|jpeg|png|gif|webp)' }),
+        ],
+        fileIsRequired: false,
+      }),
+    )
+    photo?: UploadedFileType,
+    @Request() req?,
     @Query('userId') targetUserId?: string,
   ) {
     try {
       const isAdmin = req.user.role === UserRole.ADMIN;
       
-      // only admin can create contacts for other users
       if (targetUserId && !isAdmin) {
         throw new ForbiddenException('Only admins can create contacts for other users');
       }
       
       const contactUserId = targetUserId || req.user.id;
       
+      let photoUrl: string | undefined = undefined;
+      
+      if (photo) {
+        this.fileUploadService.validateFile(photo);
+        
+        const storageConfig = this.fileUploadService.getStorageConfig('contacts');
+        const multer = require('multer');
+        const upload = multer(storageConfig);
+        
+        const processedFile = await new Promise<UploadedFileType>((resolve, reject) => {
+          upload.single('photo')(req, {}, (err) => {
+            if (err) reject(err);
+            else resolve(req.file);
+          });
+        });
+
+        photoUrl = this.fileUploadService.getFileUrl(processedFile.filename, 'contacts');
+      }
+      
       const contact = await this.contactsService.createContact(
-        createContactDto,
+        { ...createContactDto, photo: photoUrl },
         req.user.id,
         contactUserId,
       );
+      
       return ResponseBuilder.success(
         { contact },
         MESSAGES.SUCCESS.CONTACT_CREATED || 'Contact created successfully',
@@ -390,10 +449,25 @@ export class ContactsController {
   }
 
   @Put(API_ROUTES.CONTACTS.UPDATE)
-  @ApiOperation({ summary: 'Update a specific contact' })
+  @UseInterceptors(FileInterceptor('photo', { storage: undefined }))
+  @ApiOperation({ summary: 'Update a specific contact with optional photo' })
   @ApiParam({ name: 'id', description: 'Contact ID (UUID)' })
-  @ApiBody({ type: UpdateContactDto })
-  @ApiQuery({ name: 'userId', required: false, description: 'Target user ID (admin only)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', example: 'Yash Gupta' },
+        email: { type: 'string', example: 'john@example.com' },
+        phone: { type: 'string', example: '+1234567890' },
+        photo: {
+          type: 'string',
+          format: 'binary',
+          description: 'Contact photo file (JPEG, PNG, GIF, WebP)',
+        },
+      },
+    },
+  })
+  @ApiConsumes('multipart/form-data')
   @ApiResponse({
     status: 200,
     description: 'Contact updated successfully',
@@ -410,9 +484,9 @@ export class ContactsController {
               properties: {
                 id: { type: 'string', example: 'uuid-here' },
                 name: { type: 'string', example: 'Yash Gupta' },
-                email: { type: 'string', example: 'Yash@example.com' },
+                email: { type: 'string', example: 'john@example.com' },
                 phone: { type: 'string', example: '+1234567890' },
-                photo: { type: 'string', example: 'https://example.com/photo.jpg' },
+                photo: { type: 'string', example: '/uploads/contacts/filename.jpg' },
                 createdAt: { type: 'string', example: '2024-01-01T00:00:00.000Z' },
                 updatedAt: { type: 'string', example: '2024-01-01T00:00:00.000Z' },
               },
@@ -442,23 +516,61 @@ export class ContactsController {
   async updateContact(
     @Param('id') id: string,
     @Body(ValidationPipe) updateContactDto: UpdateContactDto,
-    @Request() req,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
+          new FileTypeValidator({ fileType: '.(jpg|jpeg|png|gif|webp)' }),
+        ],
+        fileIsRequired: false,
+      }),
+    )
+    photo?: UploadedFileType,
+    @Request() req?,
     @Query('userId') targetUserId?: string,
   ) {
     try {
       const isAdmin = req.user.role === UserRole.ADMIN;
       
-      // only admin can update other users' contacts
       if (targetUserId && !isAdmin) {
         throw new ForbiddenException('Only admins can update other users\' contacts');
+      }
+
+      let photoUrl: string | undefined = updateContactDto.photo;
+      
+      if (photo) {
+        this.fileUploadService.validateFile(photo);
+        
+        // Delete old photo if exists
+        const existingContact = await this.contactsService.findContactById(id, req.user.id, targetUserId);
+        if (existingContact.photo) {
+          const filename = existingContact.photo.split('/').pop();
+          if (filename) {
+            await this.fileUploadService.deleteFile(filename, 'contacts');
+          }
+        }
+        
+        const storageConfig = this.fileUploadService.getStorageConfig('contacts');
+        const multer = require('multer');
+        const upload = multer(storageConfig);
+        
+        const processedFile = await new Promise<UploadedFileType>((resolve, reject) => {
+          upload.single('photo')(req, {}, (err) => {
+            if (err) reject(err);
+            else resolve(req.file);
+          });
+        });
+
+        photoUrl = this.fileUploadService.getFileUrl(processedFile.filename, 'contacts');
       }
       
       const contact = await this.contactsService.updateContact(
         id,
-        updateContactDto,
+        { ...updateContactDto, photo: photoUrl },
         req.user.id,
         targetUserId,
       );
+      
       return ResponseBuilder.success(
         { contact },
         MESSAGES.SUCCESS.CONTACT_UPDATED || 'Contact updated successfully',

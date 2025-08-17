@@ -1,1 +1,101 @@
-node_modules
+# ===========================================
+# Node.js / NestJS Application
+# ===========================================
+
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Environment & Configuration
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.*.local
+
+# Logs
+logs/
+*.log
+lerna-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage reports
+coverage/
+*.lcov
+.nyc_output/
+
+# Cache directories
+.npm/
+.eslintcache
+.parcel-cache/
+.cache/
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Package manager files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.npmrc
+.yarnrc
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Application specific
+uploads/
+database/
+*.sqlite
+*.db
+
+# Testing
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Misc
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
