@@ -13,13 +13,12 @@ import {
   HttpStatus,
   ValidationPipe,
   ForbiddenException,
+  BadRequestException,
+  Res,
   UseInterceptors,
   UploadedFile,
-  ParseFilePipe,
-  MaxFileSizeValidator,
-  FileTypeValidator,
-  Res,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import {
   ApiTags,
@@ -31,7 +30,7 @@ import {
   ApiQuery,
   ApiConsumes,
 } from '@nestjs/swagger';
-import { FileInterceptor } from '@nestjs/platform-express';
+
 import { ContactsService, ContactPaginationOptions } from './contacts.service';
 import {
   CreateContactDto,
@@ -42,8 +41,8 @@ import { JwtAuthGuard } from '../auth/guards';
 import { API_TAGS, API_ROUTES, MESSAGES } from '../common';
 import { UserRole } from '../common/entities';
 import { ResponseBuilder } from '../common/interfaces';
-import { FileUploadService } from '../common/file-upload';
-import type { UploadedFile as UploadedFileType } from '../common/file-upload';
+
+
 import { SuccessResponseDto, ErrorResponseDto } from '../common/dto/response.dto';
 
 @ApiTags(API_TAGS.CONTACTS)
@@ -53,13 +52,26 @@ import { SuccessResponseDto, ErrorResponseDto } from '../common/dto/response.dto
 export class ContactsController {
   constructor(
     private readonly contactsService: ContactsService,
-    private readonly fileUploadService: FileUploadService,
   ) {}
 
+  private validatePhotoFile(photo: Express.Multer.File): void {
+    // Check file size (max 5MB)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (photo.size > maxSize) {
+      throw new BadRequestException('Photo file size cannot exceed 5MB');
+    }
+
+    // Check file type
+    const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedMimeTypes.includes(photo.mimetype)) {
+      throw new BadRequestException('Photo must be a valid image file (JPEG, PNG, GIF, or WebP)');
+    }
+  }
+
   @Post(API_ROUTES.CONTACTS.CREATE)
-  @UseInterceptors(FileInterceptor('photo', { storage: undefined }))
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a new contact with optional photo' })
+  @UseInterceptors(FileInterceptor('photo'))
+  @ApiOperation({ summary: 'Create a new contact with optional photo file' })
   @ApiQuery({ name: 'userId', required: false, description: 'Target user ID (admin only)' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -72,10 +84,10 @@ export class ContactsController {
         photo: {
           type: 'string',
           format: 'binary',
-          description: 'Contact photo file (JPEG, PNG, GIF, WebP)',
+          description: 'Contact photo file (optional)',
         },
       },
-      required: ['name'],
+      required: ['name', 'email', 'phone'],
     },
   })
   @ApiResponse({
@@ -119,17 +131,8 @@ export class ContactsController {
     type: ErrorResponseDto,
   })
   async createContact(
-    @Body(ValidationPipe) createContactDto: CreateContactDto,
-    @UploadedFile(
-      new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
-          new FileTypeValidator({ fileType: '.(jpg|jpeg|png|gif|webp)' }),
-        ],
-        fileIsRequired: false,
-      }),
-    )
-    photo?: UploadedFileType,
+    @Body() createContactDto: CreateContactDto,
+    @UploadedFile() photo?: Express.Multer.File,
     @Request() req?,
     @Query('userId') targetUserId?: string,
   ) {
@@ -142,27 +145,15 @@ export class ContactsController {
       
       const contactUserId = targetUserId || req.user.id;
       
-      let photoUrl: string | undefined = undefined;
-      
+      // Process the uploaded photo file if provided
       if (photo) {
-        this.fileUploadService.validateFile(photo);
-        
-        const storageConfig = this.fileUploadService.getStorageConfig('contacts');
-        const multer = require('multer');
-        const upload = multer(storageConfig);
-        
-        const processedFile = await new Promise<UploadedFileType>((resolve, reject) => {
-          upload.single('photo')(req, {}, (err) => {
-            if (err) reject(err);
-            else resolve(req.file);
-          });
-        });
-
-        photoUrl = this.fileUploadService.getFileUrl(processedFile.filename, 'contacts');
+        // Validate photo file
+        this.validatePhotoFile(photo);
+        createContactDto.photo = photo;
       }
       
       const contact = await this.contactsService.createContact(
-        { ...createContactDto, photo: photoUrl },
+        createContactDto,
         req.user.id,
         contactUserId,
       );
@@ -240,7 +231,7 @@ export class ContactsController {
     type: ErrorResponseDto,
   })
   async getAllContacts(
-    @Query(ValidationPipe) paginationDto: ContactPaginationDto,
+    @Query() paginationDto: ContactPaginationDto,
     @Query('search') search?: string,
     @Query('userId') targetUserId?: string,
     @Request() req?,
@@ -354,7 +345,7 @@ export class ContactsController {
     type: ErrorResponseDto,
   })
   async getAllContactsForAdmin(
-    @Query(ValidationPipe) paginationDto: ContactPaginationDto,
+    @Query() paginationDto: ContactPaginationDto,
     @Query('search') search?: string,
     @Request() req?,
   ) {
@@ -451,9 +442,10 @@ export class ContactsController {
   }
 
   @Put(API_ROUTES.CONTACTS.UPDATE)
-  @UseInterceptors(FileInterceptor('photo', { storage: undefined }))
-  @ApiOperation({ summary: 'Update a specific contact with optional photo' })
+  @UseInterceptors(FileInterceptor('photo'))
+  @ApiOperation({ summary: 'Update an existing contact with optional photo file' })
   @ApiParam({ name: 'id', description: 'Contact ID (UUID)' })
+  @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
       type: 'object',
@@ -464,12 +456,11 @@ export class ContactsController {
         photo: {
           type: 'string',
           format: 'binary',
-          description: 'Contact photo file (JPEG, PNG, GIF, WebP)',
+          description: 'Contact photo file (optional)',
         },
       },
     },
   })
-  @ApiConsumes('multipart/form-data')
   @ApiResponse({
     status: 200,
     description: 'Contact updated successfully',
@@ -488,7 +479,7 @@ export class ContactsController {
                 name: { type: 'string', example: 'Yash Gupta' },
                 email: { type: 'string', example: 'john@example.com' },
                 phone: { type: 'string', example: '+1234567890' },
-                photo: { type: 'string', example: '/uploads/contacts/filename.jpg' },
+                photo: { type: 'string', example: 'data:image/jpeg;base64,...' },
                 createdAt: { type: 'string', example: '2024-01-01T00:00:00.000Z' },
                 updatedAt: { type: 'string', example: '2024-01-01T00:00:00.000Z' },
               },
@@ -517,58 +508,75 @@ export class ContactsController {
   })
   async updateContact(
     @Param('id') id: string,
-    @Body(ValidationPipe) updateContactDto: UpdateContactDto,
-    @UploadedFile(
-      new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
-          new FileTypeValidator({ fileType: '.(jpg|jpeg|png|gif|webp)' }),
-        ],
-        fileIsRequired: false,
-      }),
-    )
-    photo?: UploadedFileType,
+    @Body() updateContactDto: UpdateContactDto,
+    @UploadedFile() photo?: Express.Multer.File,
     @Request() req?,
     @Query('userId') targetUserId?: string,
   ) {
+    // Manual validation for update operations
+    if (updateContactDto.name !== undefined && updateContactDto.name !== null) {
+      if (typeof updateContactDto.name !== 'string') {
+        throw new BadRequestException('Name must be a string');
+      }
+      if (updateContactDto.name.trim().length < 2) {
+        throw new BadRequestException('Name must be at least 2 characters long');
+      }
+      if (updateContactDto.name.trim().length > 100) {
+        throw new BadRequestException('Name cannot exceed 100 characters');
+      }
+      if (!/^[a-zA-Z\s]+$/.test(updateContactDto.name.trim())) {
+        throw new BadRequestException('Name can only contain letters and spaces');
+      }
+    }
+
+    if (updateContactDto.email !== undefined && updateContactDto.email !== null) {
+      if (typeof updateContactDto.email !== 'string') {
+        throw new BadRequestException('Email must be a string');
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(updateContactDto.email.trim())) {
+        throw new BadRequestException('Please provide a valid email address format');
+      }
+      if (updateContactDto.email.length > 255) {
+        throw new BadRequestException('Email cannot exceed 255 characters');
+      }
+    }
+
+    if (updateContactDto.phone !== undefined && updateContactDto.phone !== null) {
+      if (typeof updateContactDto.phone !== 'string') {
+        throw new BadRequestException('Phone must be a string');
+      }
+      if (!/^[\+]?[\d\s\-\(\)]{7,20}$/.test(updateContactDto.phone.trim())) {
+        throw new BadRequestException('Please provide a valid phone number');
+      }
+      if (updateContactDto.phone.length > 20) {
+        throw new BadRequestException('Phone number cannot exceed 20 characters');
+      }
+    }
     try {
+      console.log('Update Contact - Received DTO:', updateContactDto);
+      console.log('Update Contact - Validation passed, proceeding with update');
+      
       const isAdmin = req.user.role === UserRole.ADMIN;
       
       if (targetUserId && !isAdmin) {
         throw new ForbiddenException('Only admins can update other users\' contacts');
       }
 
-      let photoUrl: string | undefined = updateContactDto.photo;
-      
+      // Process the uploaded photo file if provided
       if (photo) {
-        this.fileUploadService.validateFile(photo);
-        
-        // Delete old photo if exists
-        const existingContact = await this.contactsService.findContactById(id, req.user.id, targetUserId);
-        if (existingContact.photo) {
-          const filename = existingContact.photo.split('/').pop();
-          if (filename) {
-            await this.fileUploadService.deleteFile(filename, 'contacts');
-          }
-        }
-        
-        const storageConfig = this.fileUploadService.getStorageConfig('contacts');
-        const multer = require('multer');
-        const upload = multer(storageConfig);
-        
-        const processedFile = await new Promise<UploadedFileType>((resolve, reject) => {
-          upload.single('photo')(req, {}, (err) => {
-            if (err) reject(err);
-            else resolve(req.file);
-          });
-        });
-
-        photoUrl = this.fileUploadService.getFileUrl(processedFile.filename, 'contacts');
+        // Validate photo file
+        this.validatePhotoFile(photo);
+        updateContactDto.photo = photo;
+      } else {
+        // Explicitly remove photo field if no file uploaded to avoid undefined
+        delete updateContactDto.photo;
       }
+      
+      console.log('Update Contact - Processed DTO:', updateContactDto);
       
       const contact = await this.contactsService.updateContact(
         id,
-        { ...updateContactDto, photo: photoUrl },
+        updateContactDto,
         req.user.id,
         targetUserId,
       );
@@ -579,6 +587,7 @@ export class ContactsController {
         `${API_ROUTES.CONTACTS.BASE}/${id}`,
       );
     } catch (error) {
+      console.error('Update Contact - Error:', error);
       throw error;
     }
   }
@@ -629,6 +638,9 @@ export class ContactsController {
   @Get(API_ROUTES.CONTACTS.EXPORT_CSV)
   @ApiOperation({ summary: 'Export contacts to CSV format' })
   @ApiQuery({ name: 'userId', required: false, description: 'Target user ID (admin only)' })
+  @ApiQuery({ name: 'search', required: false, description: 'Search term for name, email, or phone' })
+  @ApiQuery({ name: 'sortBy', required: false, description: 'Sort field (name, email, phone, createdAt, updatedAt)' })
+  @ApiQuery({ name: 'sortOrder', required: false, description: 'Sort order (ASC or DESC)' })
   @ApiResponse({
     status: 200,
     description: 'CSV file generated successfully',
@@ -651,6 +663,9 @@ export class ContactsController {
     @Request() req,
     @Res() res: Response,
     @Query('userId') targetUserId?: string,
+    @Query('search') search?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC',
   ) {
     try {
       const isAdmin = req.user.role === UserRole.ADMIN;
@@ -659,26 +674,51 @@ export class ContactsController {
         throw new ForbiddenException('Only admins can export other users\' contacts');
       }
 
-      let filename: string;
+      // Prepare export options
+      const exportOptions = {
+        search,
+        sortBy,
+        sortOrder,
+      };
+
+      let exportData;
       
       if (isAdmin && !targetUserId) {
-        filename = await this.contactsService.exportAllContactsToCsv();
+        exportData = await this.contactsService.exportAllContactsToCsv(exportOptions);
       } else {
-        filename = await this.contactsService.exportContactsToCsv(req.user.id, targetUserId);
+        exportData = await this.contactsService.exportContactsToCsv(req.user.id, targetUserId, exportOptions);
       }
 
-      const filePath = `./uploads/exports/${filename}`;
+      // Generate CSV content
+      const csvContent = this.generateCsvContent(exportData.contacts, exportData.headers);
       
+      // Set response headers
+      const filename = `contacts_${new Date().toISOString().split('T')[0]}.csv`;
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', Buffer.byteLength(csvContent, 'utf8'));
       
-      return res.download(filePath, filename, (err) => {
-        if (err) {
-          console.error('Error downloading file:', err);
-        }
-      });
+      // Send CSV content directly
+      return res.send(csvContent);
     } catch (error) {
       throw error;
     }
+  }
+
+  private generateCsvContent(contacts: any[], headers: string[]): string {
+    // Create CSV header row
+    const csvRows = [headers.join(',')];
+    
+    // Add data rows
+    contacts.forEach(contact => {
+      const row = [
+        `"${contact.name.replace(/"/g, '""')}"`,
+        `"${(contact.email || '').replace(/"/g, '""')}"`,
+        `"${(contact.phone || '').replace(/"/g, '""')}"`,
+      ];
+      csvRows.push(row.join(','));
+    });
+    
+    return csvRows.join('\n');
   }
 }

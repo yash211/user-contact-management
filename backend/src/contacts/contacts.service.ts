@@ -4,7 +4,7 @@ import { Repository, SelectQueryBuilder } from 'typeorm';
 import { Contact } from '../common/entities/contact.entity';
 import { CreateContactDto, UpdateContactDto } from '../common/dto/contact.dto';
 import { UserRole } from '../common/entities/user.entity';
-import * as createCsvWriter from 'csv-writer';
+import { transformContactPhoto, transformContactsPhotos } from '../common/utils/photo.utils';
 
 export interface ContactPaginationOptions {
   page: number;
@@ -35,11 +35,22 @@ export class ContactsService {
 
   async createContact(createContactDto: CreateContactDto, userId: string, targetUserId?: string): Promise<Contact> {
     const contactUserId = targetUserId || userId;
+    
+    // Convert photo file to buffer if provided
+    const photoData = createContactDto.photo && 'buffer' in createContactDto.photo 
+      ? createContactDto.photo.buffer 
+      : null;
+    
     const contact = this.contactRepository.create({
-      ...createContactDto,
+      name: createContactDto.name,
+      email: createContactDto.email,
+      phone: createContactDto.phone,
+      photo: photoData,
       userId: contactUserId,
     });
-    return await this.contactRepository.save(contact);
+    
+    const savedContact = await this.contactRepository.save(contact);
+    return transformContactPhoto(savedContact);
   }
 
   async findAllContacts(
@@ -78,12 +89,15 @@ export class ContactsService {
 
     const contacts = await queryBuilder.getMany();
 
+    // Transform photo data for API response
+    const transformedContacts = transformContactsPhotos(contacts);
+
     const totalPages = Math.ceil(total / limit);
     const hasNext = page < totalPages;
     const hasPrev = page > 1;
 
     return {
-      contacts,
+      contacts: transformedContacts,
       pagination: {
         page,
         limit,
@@ -104,7 +118,7 @@ export class ContactsService {
       throw new NotFoundException('Contact not found');
     }
 
-    return contact;
+    return transformContactPhoto(contact);
   }
 
   async updateContact(
@@ -115,8 +129,64 @@ export class ContactsService {
   ): Promise<Contact> {
     const contact = await this.findContactById(id, userId, targetUserId);
     
-    Object.assign(contact, updateContactDto);
-    return await this.contactRepository.save(contact);
+    console.log('Update Contact - Existing photo before update:', !!contact.photo);
+    console.log('Update Contact - DTO photo provided:', !!updateContactDto.photo);
+    console.log('Update Contact - DTO photo type:', typeof updateContactDto.photo);
+    console.log('Update Contact - DTO photo starts with data:image:', updateContactDto.photo && typeof updateContactDto.photo === 'string' ? (updateContactDto.photo as string).startsWith('data:image/') : 'N/A');
+    
+    // Convert photo file to buffer if provided, otherwise preserve existing photo
+    if (updateContactDto.photo && 'buffer' in updateContactDto.photo) {
+      // New photo file uploaded
+      contact.photo = updateContactDto.photo.buffer;
+      console.log('Update Contact - New photo set');
+    } else if (updateContactDto.photo && typeof updateContactDto.photo === 'string' && (updateContactDto.photo as string).startsWith('data:image/')) {
+      // Existing photo data sent from frontend - preserve it
+      console.log('Update Contact - Existing photo data received, preserving');
+      // Don't change contact.photo - keep the existing buffer
+    } else if (updateContactDto.photo === undefined || updateContactDto.photo === null) {
+      console.log('Update Contact - No photo provided, preserving existing photo');
+      // Explicitly don't change contact.photo - keep the existing buffer
+    } else {
+      console.log('Update Contact - Unexpected photo type, preserving existing photo');
+      console.log('Update Contact - Photo data type:', typeof updateContactDto.photo);
+      // Don't change contact.photo - keep the existing buffer
+    }
+    
+    // Create an update object with only the fields that should be updated
+    const updateData: Partial<Contact> = {};
+    
+    // Update other fields only if provided
+    if (updateContactDto.name !== undefined) {
+      contact.name = updateContactDto.name;
+      updateData.name = updateContactDto.name;
+    }
+    if (updateContactDto.email !== undefined) {
+      contact.email = updateContactDto.email;
+      updateData.email = updateContactDto.email;
+    }
+    if (updateContactDto.phone !== undefined) {
+      contact.phone = updateContactDto.phone;
+      updateData.phone = updateContactDto.phone;
+    }
+    
+    // Only update photo if a new one was provided (not undefined, not null)
+    if (updateContactDto.photo && 'buffer' in updateContactDto.photo) {
+      contact.photo = updateContactDto.photo.buffer;
+      updateData.photo = updateContactDto.photo.buffer;
+    }
+    // If photo is undefined or null, don't include it in updateData at all
+    
+    console.log('Update Contact - Photo after field updates:', !!contact.photo);
+    console.log('Update Contact - Fields being updated:', Object.keys(updateData));
+    
+    // Use update instead of save to avoid updating fields we don't want to change
+    await this.contactRepository.update(contact.id, updateData);
+    
+    // Return the updated contact
+    const savedContact = await this.findContactById(contact.id, userId, targetUserId);
+    console.log('Update Contact - Photo after save:', !!savedContact.photo);
+    
+    return transformContactPhoto(savedContact);
   }
 
   async deleteContact(id: string, userId: string, targetUserId?: string): Promise<void> {
@@ -176,12 +246,11 @@ export class ContactsService {
     };
   }
 
-  async exportContactsToCsv(userId: string, targetUserId?: string): Promise<string> {
+  async exportContactsToCsv(userId: string, targetUserId?: string, options?: { search?: string; sortBy?: string; sortOrder?: 'ASC' | 'DESC' }): Promise<{ contacts: any[], headers: string[] }> {
     let queryBuilder: SelectQueryBuilder<Contact> = this.contactRepository
       .createQueryBuilder('contact')
       .leftJoinAndSelect('contact.user', 'user')
-      .addSelect(['user.id', 'user.name', 'user.email'])
-      .orderBy('contact.createdAt', 'DESC');
+      .addSelect(['user.id', 'user.name', 'user.email']);
 
     if (targetUserId) {
       queryBuilder = queryBuilder.where('contact.userId = :userId', { userId: targetUserId });
@@ -189,71 +258,63 @@ export class ContactsService {
       queryBuilder = queryBuilder.where('contact.userId = :userId', { userId });
     }
 
+    // Apply search filter
+    if (options?.search) {
+      queryBuilder = queryBuilder.andWhere(
+        '(contact.name ILIKE :search OR contact.email ILIKE :search OR contact.phone ILIKE :search)',
+        { search: `%${options.search}%` }
+      );
+    }
+
+    // Apply sorting
+    if (options?.sortBy && options?.sortOrder) {
+      queryBuilder = queryBuilder.orderBy(`contact.${options.sortBy}`, options.sortOrder);
+    } else {
+      queryBuilder = queryBuilder.orderBy('contact.createdAt', 'DESC');
+    }
+
     const contacts = await queryBuilder.getMany();
 
-    const csvWriter = createCsvWriter.createObjectCsvWriter({
-      path: `./uploads/exports/contacts_${Date.now()}.csv`,
-      header: [
-        { id: 'name', title: 'Name' },
-        { id: 'email', title: 'Email' },
-        { id: 'phone', title: 'Phone' },
-        { id: 'userName', title: 'User Name' },
-        { id: 'userEmail', title: 'User Email' },
-        { id: 'createdAt', title: 'Created At' },
-        { id: 'updatedAt', title: 'Updated At' },
-      ],
-    });
-
+    const headers = ['Name', 'Email', 'Phone'];
     const records = contacts.map(contact => ({
       name: contact.name,
       email: contact.email || '',
       phone: contact.phone || '',
-      userName: contact.user?.name || '',
-      userEmail: contact.user?.email || '',
-      createdAt: contact.createdAt.toISOString(),
-      updatedAt: contact.updatedAt.toISOString(),
     }));
 
-    await csvWriter.writeRecords(records);
-    
-    const filename = `contacts_${Date.now()}.csv`;
-    return filename;
+    return { contacts: records, headers };
   }
 
-  async exportAllContactsToCsv(): Promise<string> {
-    const contacts = await this.contactRepository
+  async exportAllContactsToCsv(options?: { search?: string; sortBy?: string; sortOrder?: 'ASC' | 'DESC' }): Promise<{ contacts: any[], headers: string[] }> {
+    let queryBuilder = this.contactRepository
       .createQueryBuilder('contact')
       .leftJoinAndSelect('contact.user', 'user')
-      .addSelect(['user.id', 'user.name', 'user.email'])
-      .orderBy('contact.createdAt', 'DESC')
-      .getMany();
+      .addSelect(['user.id', 'user.name', 'user.email']);
 
-    const csvWriter = createCsvWriter.createObjectCsvWriter({
-      path: `./uploads/exports/all_contacts_${Date.now()}.csv`,
-      header: [
-        { id: 'name', title: 'Name' },
-        { id: 'email', title: 'Email' },
-        { id: 'phone', title: 'Phone' },
-        { id: 'userName', title: 'User Name' },
-        { id: 'userEmail', title: 'User Email' },
-        { id: 'createdAt', title: 'Created At' },
-        { id: 'updatedAt', title: 'Updated At' },
-      ],
-    });
+    // Apply search filter
+    if (options?.search) {
+      queryBuilder = queryBuilder.andWhere(
+        '(contact.name ILIKE :search OR contact.email ILIKE :search OR contact.phone ILIKE :search)',
+        { search: `%${options.search}%` }
+      );
+    }
 
+    // Apply sorting
+    if (options?.sortBy && options?.sortOrder) {
+      queryBuilder = queryBuilder.orderBy(`contact.${options.sortBy}`, options.sortOrder);
+    } else {
+      queryBuilder = queryBuilder.orderBy('contact.createdAt', 'DESC');
+    }
+
+    const contacts = await queryBuilder.getMany();
+
+    const headers = ['Name', 'Email', 'Phone'];
     const records = contacts.map(contact => ({
       name: contact.name,
       email: contact.email || '',
       phone: contact.phone || '',
-      userName: contact.user?.name || '',
-      userEmail: contact.user?.email || '',
-      createdAt: contact.createdAt.toISOString(),
-      updatedAt: contact.updatedAt.toISOString(),
     }));
 
-    await csvWriter.writeRecords(records);
-    
-    const filename = `all_contacts_${Date.now()}.csv`;
-    return filename;
+    return { contacts: records, headers };
   }
 }

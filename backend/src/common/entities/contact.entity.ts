@@ -15,8 +15,8 @@ export class Contact {
   @Column({ type: 'varchar', length: 20, nullable: true })
   phone: string;
 
-  @Column({ type: 'varchar', length: 500, nullable: true })
-  photo: string | null;
+  @Column({ type: 'bytea', nullable: true })
+  photo: Buffer | null;
 
   @Column({ type: 'uuid' })
   userId: string;
