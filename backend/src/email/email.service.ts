@@ -6,11 +6,9 @@ import { Contact } from '../common/entities/contact.entity';
 export class EmailService {
   constructor(private readonly mailerService: MailerService) {}
 
+  // Sends email notification when a contact is created
   async sendContactCreatedEmail(contact: Contact, userEmail: string, userName: string): Promise<void> {
     try {
-      // Debug: Log email attempt
-      console.log('Attempting to send email to:', userEmail);
-
       const emailContent = `
 Hello ${userName},
 
@@ -33,10 +31,8 @@ Contact Management Team
         subject: 'New Contact Created Successfully',
         text: emailContent,
       });
-      console.log(`Email sent successfully to ${userEmail} for contact creation`);
     } catch (error) {
       console.error('Failed to send contact creation email:', error);
-      // Don't throw error to avoid breaking the contact creation flow
     }
   }
 }

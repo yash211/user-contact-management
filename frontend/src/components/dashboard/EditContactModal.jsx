@@ -118,16 +118,11 @@ const EditContactModal = ({ isOpen, onClose, contact, onSubmit, loading }) => {
       }
       // NOTE: If photo is NOT changed, we don't include photo field at all
 
-      console.log('Sending contact data:', contactData);
-      console.log('Photo included:', !!contactData.photo);
-      console.log('Photo type:', contactData.photo ? typeof contactData.photo : 'none');
-
       const success = await onSubmit(contact.id, contactData);
       if (success) {
         onClose();
       }
     } catch (error) {
-      console.error('Update error:', error);
       alert('Failed to update contact. Please try again.');
     }
   };

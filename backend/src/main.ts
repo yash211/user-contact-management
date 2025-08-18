@@ -6,21 +6,19 @@ import { HttpExceptionFilter } from './common';
 import { join } from 'path';
 import { NestExpressApplication } from '@nestjs/platform-express';
 
+// Bootstraps the NestJS application with all configurations
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Set global prefix for all routes
   app.setGlobalPrefix('api');
 
-  // Enable CORS for development
   app.enableCors({
-    origin: true, // Allow all origins in development
+    origin: true,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
   });
 
-  // Enable validation with detailed error messages
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
     forbidNonWhitelisted: true,
@@ -36,12 +34,8 @@ async function bootstrap() {
     },
   }));
 
-  // Global exception filter for consistent error responses
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  // Static file serving removed - photos now stored as BLOB in database
-
-  // Swagger configuration
   const config = new DocumentBuilder()
     .setTitle('User Contact Management API')
     .setDescription('A simple API for managing users and contacts')

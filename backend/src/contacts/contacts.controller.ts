@@ -54,20 +54,20 @@ export class ContactsController {
     private readonly contactsService: ContactsService,
   ) {}
 
+  // Validates uploaded photo file size and type
   private validatePhotoFile(photo: Express.Multer.File): void {
-    // Check file size (max 5MB)
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    const maxSize = 5 * 1024 * 1024;
     if (photo.size > maxSize) {
       throw new BadRequestException('Photo file size cannot exceed 5MB');
     }
 
-    // Check file type
     const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowedMimeTypes.includes(photo.mimetype)) {
       throw new BadRequestException('Photo must be a valid image file (JPEG, PNG, GIF, or WebP)');
     }
   }
 
+  // Creates a new contact with optional photo upload
   @Post(API_ROUTES.CONTACTS.CREATE)
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(FileInterceptor('photo'))

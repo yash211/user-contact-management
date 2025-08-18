@@ -14,8 +14,8 @@ export class UsersService {
     private readonly contactRepository: Repository<Contact>,
   ) {}
 
+  // Creates a new user with validation
   async createUser(createUserDto: CreateUserDto): Promise<User> {
-    // Validate required fields
     if (!createUserDto.name || createUserDto.name.trim().length === 0) {
       throw new BadRequestException('Name is required');
     }
@@ -28,13 +28,11 @@ export class UsersService {
       throw new BadRequestException('Password is required and must be at least 6 characters long');
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(createUserDto.email)) {
       throw new BadRequestException('Invalid email format');
     }
 
-    // Validate phone format if provided
     if (createUserDto.phone) {
       const phoneRegex = /^\+?[\d\s\-\(\)]+$/;
       if (!phoneRegex.test(createUserDto.phone)) {
@@ -42,12 +40,10 @@ export class UsersService {
       }
     }
 
-    // Validate role if provided
     if (createUserDto.role && !['user', 'admin'].includes(createUserDto.role)) {
       throw new BadRequestException('Role must be either "user" or "admin"');
     }
 
-    // Check if user with email already exists
     const existingUser = await this.userRepository.findOne({
       where: { email: createUserDto.email.toLowerCase().trim() }
     });
@@ -56,7 +52,6 @@ export class UsersService {
       throw new ConflictException('User with this email already exists');
     }
 
-    // Create user with validated data
     const userData = {
       ...createUserDto,
       email: createUserDto.email.toLowerCase().trim(),
@@ -69,11 +64,11 @@ export class UsersService {
     const user = this.userRepository.create(userData);
     const savedUser = await this.userRepository.save(user);
     
-    // Remove password from response
     const { password, ...userWithoutPassword } = savedUser;
     return userWithoutPassword as User;
   }
 
+  // Retrieves paginated users with search and sorting
   async findAllUsers(options: UserPaginationOptions): Promise<PaginatedUsersResponse> {
     const { page = 1, limit = 10, search, sortBy = 'createdAt', sortOrder = 'DESC' } = options;
     
@@ -92,7 +87,7 @@ export class UsersService {
         'user.isActive',
         'user.createdAt',
         'user.updatedAt'
-      ]); // Exclude password
+      ]);
 
     if (search) {
       queryBuilder = queryBuilder.andWhere(
@@ -132,6 +127,7 @@ export class UsersService {
     };
   }
 
+  // Finds a user by ID excluding password
   async findUserById(id: string): Promise<User> {
     const user = await this.userRepository.findOne({
       where: { id },
@@ -145,7 +141,7 @@ export class UsersService {
         'isActive',
         'createdAt',
         'updatedAt'
-      ] // Exclude password
+      ]
     });
 
     if (!user) {
@@ -157,10 +153,10 @@ export class UsersService {
 
 
 
+  // Deletes a user if they have no contacts
   async deleteUser(id: string): Promise<void> {
     const user = await this.findUserById(id);
     
-    // Check if user has any contacts using the contact repository
     const contactCount = await this.contactRepository.count({
       where: { user: { id } }
     });
@@ -169,7 +165,6 @@ export class UsersService {
       throw new BadRequestException('Cannot delete user with existing contacts. Please delete their contacts first.');
     }
 
-    // If no contacts, proceed with deletion
     await this.userRepository.remove(user);
   }
 

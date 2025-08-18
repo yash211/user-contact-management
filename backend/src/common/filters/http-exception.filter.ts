@@ -31,6 +31,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     response.status(status).json(errorResponse);
   }
 
+  // Maps HTTP status codes to error codes
   private getErrorCode(status: number): string {
     switch (status) {
       case 400:

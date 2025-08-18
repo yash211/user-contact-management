@@ -61,15 +61,12 @@ const LoginForm = () => {
       
       // Check if the response has the expected structure
       if (result.success && result.data && result.data.accessToken) {
-        console.log('Login successful, setting token and dispatching success');
         tokenService.setToken(result.data.accessToken);
         dispatch(loginSuccess(result.data));
       } else {
-        console.error('Invalid response format:', result);
         throw new Error('Invalid response format from server');
       }
     } catch (error) {
-      console.error('Login error:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Login failed';
       dispatch(loginFailure(errorMessage));
     }

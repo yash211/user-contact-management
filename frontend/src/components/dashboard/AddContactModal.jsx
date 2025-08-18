@@ -193,8 +193,6 @@ const AddContactModal = ({ isOpen, onClose, onSubmit, loading, onSuccess }) => {
           }
         }
       } catch (err) {
-        console.error('Error creating contact:', err);
-        
         // Handle backend validation errors
         if (err.response?.data?.message) {
           const errorMessage = err.response.data.message;

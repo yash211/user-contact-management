@@ -27,7 +27,6 @@ const Users = () => {
         setPagination(response.data.data.pagination);
       }
     } catch (err) {
-      console.error('Error fetching users:', err);
       setError(err.response?.data?.message || 'Failed to fetch users');
     } finally {
       setLoading(false);
@@ -53,7 +52,6 @@ const Users = () => {
       }
     } catch (err) {
       const errorMessage = err.response?.data?.message || 'Failed to create user';
-      console.error('Error creating user:', err);
       alert(`Error: ${errorMessage}`);
       return Promise.reject(new Error(errorMessage));
     }
@@ -68,7 +66,6 @@ const Users = () => {
       }
     } catch (err) {
       const errorMessage = err.response?.data?.message || 'Failed to delete user';
-      console.error('Error deleting user:', err);
       alert(`Error: ${errorMessage}`);
     }
   };

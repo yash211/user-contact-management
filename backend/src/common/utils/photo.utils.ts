@@ -1,38 +1,25 @@
-/**
- * Utility functions for handling photo data transformations
- */
-
-/**
- * Convert Buffer to base64 string for frontend consumption
- */
+// Converts Buffer to base64 string for frontend consumption
 export function bufferToBase64(buffer: Buffer | null): string | null {
   if (!buffer) return null;
   return `data:image/jpeg;base64,${buffer.toString('base64')}`;
 }
 
-/**
- * Convert base64 string back to Buffer for database storage
- */
+// Converts base64 string back to Buffer for database storage
 export function base64ToBuffer(base64: string | null): Buffer | null {
   if (!base64) return null;
   
-  // Remove data URL prefix if present
   const base64Data = base64.replace(/^data:image\/[a-z]+;base64,/, '');
   return Buffer.from(base64Data, 'base64');
 }
 
-/**
- * Transform contact photo data for API response
- */
+// Transforms contact photo data for API response
 export function transformContactPhoto(contact: any): any {
   if (contact && contact.photo) {
     try {
-      // Handle Buffer-like object from PostgreSQL
       if (contact.photo && typeof contact.photo === 'object' && contact.photo.type === 'Buffer' && Array.isArray(contact.photo.data)) {
         const buffer = Buffer.from(contact.photo.data);
         contact.photo = bufferToBase64(buffer);
       }
-      // Handle actual Buffer
       else if (Buffer.isBuffer(contact.photo)) {
         contact.photo = bufferToBase64(contact.photo);
       }
@@ -43,9 +30,7 @@ export function transformContactPhoto(contact: any): any {
   return contact;
 }
 
-/**
- * Transform multiple contacts photo data for API response
- */
+// Transforms multiple contacts photo data for API response
 export function transformContactsPhotos(contacts: any[]): any[] {
   return contacts.map(contact => transformContactPhoto(contact));
 }

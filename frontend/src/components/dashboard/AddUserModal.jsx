@@ -66,7 +66,7 @@ const AddUserModal = ({ isOpen, onClose, onSubmit }) => {
       await onSubmit(formData);
       handleClose();
     } catch (error) {
-      console.error('Error creating user:', error);
+      // Error handled by parent component
     } finally {
       setIsSubmitting(false);
     }
