@@ -131,6 +131,15 @@ export class ContactPaginationDto {
   limit?: number = 10;
 
   @ApiProperty({
+    description: 'Search term for name, email, or phone',
+    example: 'john',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiProperty({
     description: 'Sort field',
     example: 'createdAt',
     enum: ['name', 'email', 'phone', 'createdAt', 'updatedAt'],

@@ -1,6 +1,6 @@
 import React from 'react';
 
-const ContactsTable = ({ contacts, onEdit, onDelete }) => {
+const ContactsTable = ({ contacts, onEdit, onDelete, isAdmin = false }) => {
   const handleEdit = (contact) => {
     onEdit(contact);
   };
@@ -16,7 +16,7 @@ const ContactsTable = ({ contacts, onEdit, onDelete }) => {
       {/* Header - Responsive */}
       <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 bg-gradient-to-r from-blue-600 to-indigo-700">
         <h2 className="text-xl sm:text-2xl font-bold text-white">Contact Management System</h2>
-        <p className="text-blue-100 mt-1 text-sm sm:text-base">Manage and organize your contacts efficiently</p>
+        
       </div>
 
       {/* Desktop Table */}
@@ -27,8 +27,9 @@ const ContactsTable = ({ contacts, onEdit, onDelete }) => {
               <th className="px-4 sm:px-6 lg:px-8 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Name</th>
               <th className="px-4 sm:px-6 lg:px-8 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Email</th>
               <th className="px-4 sm:px-6 lg:px-8 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Phone</th>
-              
-              
+              {isAdmin && (
+                <th className="px-4 sm:px-6 lg:px-8 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">User Associated With</th>
+              )}
               <th className="px-4 sm:px-6 lg:px-8 py-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
@@ -76,9 +77,11 @@ const ContactsTable = ({ contacts, onEdit, onDelete }) => {
                   <div className="text-sm text-gray-900">{contact.phone}</div>
                 </td>
 
-                
-
-
+                {isAdmin && (
+                  <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">{contact.user?.name || 'N/A'}</div>
+                  </td>
+                )}
 
                 <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 whitespace-nowrap text-sm font-medium">
                   <div className="flex items-center space-x-2 sm:space-x-3">
@@ -140,9 +143,11 @@ const ContactsTable = ({ contacts, onEdit, onDelete }) => {
                  </div>
                 <div>
                   <div className="text-sm font-semibold text-gray-900">{contact.name}</div>
-                                     <div className="text-sm text-gray-600">{contact.email}</div>
-                   <div className="text-sm text-gray-600">{contact.phone}</div>
-
+                  <div className="text-sm text-gray-600">{contact.email}</div>
+                  <div className="text-sm text-gray-600">{contact.phone}</div>
+                  {isAdmin && (
+                    <div className="text-sm text-gray-600">User: {contact.user?.name || 'N/A'}</div>
+                  )}
                 </div>
               </div>
               

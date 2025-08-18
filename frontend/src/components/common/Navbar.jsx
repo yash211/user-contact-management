@@ -1,6 +1,10 @@
 import React from 'react';
+import { useSelector } from 'react-redux';
 
 const Navbar = ({ appName, userName, onLogout }) => {
+  const { user } = useSelector((state) => state.auth);
+  const isAdmin = user?.role === 'admin';
+
   return (
     <nav className="bg-white shadow-xl border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -17,6 +21,16 @@ const Navbar = ({ appName, userName, onLogout }) => {
           </div>
           
           <div className="flex items-center space-x-6">
+            {/* Users Tab - Only visible for admin users */}
+            {isAdmin && (
+              <button className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-6 py-3 rounded-xl hover:from-blue-600 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center space-x-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                </svg>
+                <span>Users</span>
+              </button>
+            )}
+            
             <span className="text-gray-700 font-medium">Welcome, {userName}</span>
             <button
               onClick={onLogout}

@@ -46,6 +46,7 @@ export const authApi = {
 
 export const contactsApi = {
   getContacts: (params) => api.get('/contacts', { params }),
+  getAllContactsForAdmin: (params) => api.get('/contacts/admin/all', { params }),
   createContact: (contactData) => {
     // If there's a photo file, create FormData for multipart upload
     if (contactData.photo && contactData.photo instanceof File) {
@@ -65,7 +66,13 @@ export const contactsApi = {
     // Otherwise, send as JSON
     return api.post('/contacts', contactData);
   },
-  updateContact: (id, contactData) => {
+  updateContact: (id, contactData, targetUserId = null) => {
+    // Build query parameters
+    const params = {};
+    if (targetUserId) {
+      params.userId = targetUserId;
+    }
+    
     // If there's a photo file, create FormData for multipart upload
     if (contactData.photo && contactData.photo instanceof File) {
       const formData = new FormData();
@@ -78,13 +85,22 @@ export const contactsApi = {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        params,
       });
     }
     
     // Otherwise, send as JSON
-    return api.put(`/contacts/${id}`, contactData);
+    return api.put(`/contacts/${id}`, contactData, { params });
   },
-  deleteContact: (id) => api.delete(`/contacts/${id}`),
+  deleteContact: (id, targetUserId = null) => {
+    // Build query parameters
+    const params = {};
+    if (targetUserId) {
+      params.userId = targetUserId;
+    }
+    
+    return api.delete(`/contacts/${id}`, { params });
+  },
   exportContacts: (params) => api.get('/contacts/export/csv', { 
     params,
     responseType: 'blob' // Important for file download

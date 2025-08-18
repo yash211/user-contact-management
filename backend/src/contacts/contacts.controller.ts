@@ -232,7 +232,6 @@ export class ContactsController {
   })
   async getAllContacts(
     @Query() paginationDto: ContactPaginationDto,
-    @Query('search') search?: string,
     @Query('userId') targetUserId?: string,
     @Request() req?,
   ) {
@@ -247,7 +246,7 @@ export class ContactsController {
       const options: ContactPaginationOptions = {
         page: paginationDto.page || 1,
         limit: paginationDto.limit || 10,
-        search,
+        search: paginationDto.search,
         sortBy: paginationDto.sortBy || 'createdAt',
         sortOrder: paginationDto.sortOrder || 'DESC',
       };
@@ -679,6 +678,7 @@ export class ContactsController {
         search,
         sortBy,
         sortOrder,
+        isAdmin,
       };
 
       let exportData;
@@ -711,11 +711,22 @@ export class ContactsController {
     
     // Add data rows
     contacts.forEach(contact => {
-      const row = [
-        `"${contact.name.replace(/"/g, '""')}"`,
-        `"${(contact.email || '').replace(/"/g, '""')}"`,
-        `"${(contact.phone || '').replace(/"/g, '""')}"`,
-      ];
+      const row: string[] = [];
+      
+      // Add fields based on headers
+      if (headers.includes('Name')) {
+        row.push(`"${contact.name.replace(/"/g, '""')}"`);
+      }
+      if (headers.includes('Email')) {
+        row.push(`"${(contact.email || '').replace(/"/g, '""')}"`);
+      }
+      if (headers.includes('Phone')) {
+        row.push(`"${(contact.phone || '').replace(/"/g, '""')}"`);
+      }
+      if (headers.includes('User')) {
+        row.push(`"${(contact.user || '').replace(/"/g, '""')}"`);
+      }
+      
       csvRows.push(row.join(','));
     });
     

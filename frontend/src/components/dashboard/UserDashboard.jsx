@@ -62,7 +62,11 @@ const UserDashboard = () => {
       };
       
       console.log('Fetching contacts with params:', params);
-      const response = await contactsApi.getContacts(params);
+      
+             // Use admin endpoint if user is admin
+       const response = user?.role === 'admin' 
+         ? await contactsApi.getAllContactsForAdmin(params)
+         : await contactsApi.getContacts(params);
       
       if (response.data.success) {
         const contactsData = response.data.data.contacts || [];
@@ -141,7 +145,15 @@ const UserDashboard = () => {
   const handleDeleteContact = async (contactId) => {
     try {
       console.log('Deleting contact:', contactId);
-      const response = await contactsApi.deleteContact(contactId);
+      
+      // Find the contact to get the targetUserId for admin users
+      const contact = contacts.find(c => c.id === contactId);
+      const targetUserId = user?.role === 'admin' && contact?.userId ? contact.userId : null;
+      
+      console.log('Delete - Contact found:', contact);
+      console.log('Delete - Target user ID:', targetUserId);
+      
+      const response = await contactsApi.deleteContact(contactId, targetUserId);
       
       console.log('Delete response:', response);
       console.log('Delete response data:', response.data);
@@ -206,7 +218,15 @@ const UserDashboard = () => {
       setIsUpdatingContact(true);
       
       console.log('Updating contact:', contactId, contactData);
-      const response = await contactsApi.updateContact(contactId, contactData);
+      
+      // Find the contact to get the targetUserId for admin users
+      const contact = contacts.find(c => c.id === contactId);
+      const targetUserId = user?.role === 'admin' && contact?.userId ? contact.userId : null;
+      
+      console.log('Edit - Contact found:', contact);
+      console.log('Edit - Target user ID:', targetUserId);
+      
+      const response = await contactsApi.updateContact(contactId, contactData, targetUserId);
       
       if (response.data.success) {
         console.log('Update response:', response.data);
@@ -360,7 +380,9 @@ const UserDashboard = () => {
                 contacts={contacts} 
                 onEdit={handleEditContact}
                 onDelete={handleDeleteContact}
+                isAdmin={user?.role === 'admin'}
               />
+              
              
              {totalContacts > pageSize && (
                <div className="mt-4 sm:mt-6 flex justify-center sm:justify-end">

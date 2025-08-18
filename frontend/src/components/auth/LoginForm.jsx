@@ -38,6 +38,9 @@ const LoginForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Prevent multiple submissions
+    if (loading) return;
+    
     // Validate form before submission
     const emailError = validateEmail(formData.email);
     const passwordError = validatePassword(formData.password);
