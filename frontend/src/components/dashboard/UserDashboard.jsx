@@ -127,6 +127,7 @@ const UserDashboard = () => {
   };
 
   const handleAddContact = () => {
+    alert('Opening Add Contact form...');
     setIsAddModalOpen(true);
   };
 
@@ -135,6 +136,7 @@ const UserDashboard = () => {
   };
 
   const handleEditContact = (contact) => {
+    alert(`Opening Edit Contact form for: ${contact.name} (${contact.email})`);
     setEditingContact(contact);
     setIsEditModalOpen(true);
   };
@@ -186,6 +188,8 @@ const UserDashboard = () => {
     try {
       setIsAddingContact(true);
       
+      alert(`Adding new contact: ${contactData.name} (${contactData.email})`);
+      
       // contactData now contains the photo file directly
       const response = await contactsApi.createContact(contactData);
       
@@ -195,7 +199,7 @@ const UserDashboard = () => {
         setCurrentPage(1); // Reset to first page
         fetchContacts();
         
-                // Show success message (you can add a toast notification here)
+        alert('Contact added successfully!');
         return true; // Return success
             } else {
         // Handle validation errors from backend
@@ -209,6 +213,7 @@ const UserDashboard = () => {
       if (err.response?.data?.message) {
         console.error('Backend error:', err.response.data.message);
       }
+      alert(`Error: ${err.response?.data?.message || err.message || 'Failed to add contact'}`);
       throw err; // Re-throw to trigger form reset
    } finally {
       setIsAddingContact(false);
@@ -219,10 +224,12 @@ const UserDashboard = () => {
     try {
       setIsUpdatingContact(true);
       
+      const contact = contacts.find(c => c.id === contactId);
+      alert(`Updating contact: ${contact?.name} (${contact?.email})`);
+      
       console.log('Updating contact:', contactId, contactData);
       
       // Find the contact to get the targetUserId for admin users
-      const contact = contacts.find(c => c.id === contactId);
       const targetUserId = user?.role === 'admin' && contact?.userId ? contact.userId : null;
       
       console.log('Edit - Contact found:', contact);
@@ -253,6 +260,7 @@ const UserDashboard = () => {
         
         // Show success message
         console.log('Contact updated successfully');
+        alert('Contact updated successfully!');
         return true;
       } else {
         // Handle validation errors from backend
@@ -266,6 +274,7 @@ const UserDashboard = () => {
       if (err.response?.data?.message) {
         console.error('Backend error:', err.response.data.message);
       }
+      alert(`Error: ${err.response?.data?.message || err.message || 'Failed to update contact'}`);
       throw err;
     } finally {
       setIsUpdatingContact(false);

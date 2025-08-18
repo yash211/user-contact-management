@@ -112,17 +112,22 @@ const EditContactModal = ({ isOpen, onClose, contact, onSubmit, loading }) => {
       contactData.email = formData.email.trim();
       contactData.phone = formData.phone.trim();
 
-      // ONLY include photo if it was actually changed
-      if (isPhotoChanged && formData.photo) {
+      // ONLY include photo if it was actually changed and is a valid file
+      if (isPhotoChanged && formData.photo && formData.photo instanceof File) {
         contactData.photo = formData.photo;
       }
       // NOTE: If photo is NOT changed, we don't include photo field at all
+
+      console.log('Sending contact data:', contactData);
+      console.log('Photo included:', !!contactData.photo);
+      console.log('Photo type:', contactData.photo ? typeof contactData.photo : 'none');
 
       const success = await onSubmit(contact.id, contactData);
       if (success) {
         onClose();
       }
     } catch (error) {
+      console.error('Update error:', error);
       alert('Failed to update contact. Please try again.');
     }
   };
