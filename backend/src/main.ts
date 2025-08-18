@@ -20,8 +20,21 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
   });
 
-  // Enable validation
-  app.useGlobalPipes(new ValidationPipe());
+  // Enable validation with detailed error messages
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
+    enableDebugMessages: true,
+    skipMissingProperties: false,
+    skipNullProperties: false,
+    skipUndefinedProperties: false,
+    forbidUnknownValues: true,
+    validationError: {
+      target: false,
+      value: false,
+    },
+  }));
 
   // Global exception filter for consistent error responses
   app.useGlobalFilters(new HttpExceptionFilter());

@@ -7,6 +7,7 @@ import ContactFilters from './ContactFilters';
 import ContactsTable from './ContactsTable';
 import Pagination from '../common/Pagination';
 import AddContactModal from './AddContactModal';
+import EditContactModal from './EditContactModal';
 
 
 const UserDashboard = () => {
@@ -26,6 +27,9 @@ const UserDashboard = () => {
   const [searchTimeout, setSearchTimeout] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAddingContact, setIsAddingContact] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingContact, setEditingContact] = useState(null);
+  const [isUpdatingContact, setIsUpdatingContact] = useState(false);
 
   useEffect(() => {
     fetchContacts();
@@ -57,25 +61,32 @@ const UserDashboard = () => {
         sortOrder: sortOrder
       };
       
-             const response = await contactsApi.getContacts(params);
-       
-               if (response.data.success) {
-          const contactsData = response.data.data.contacts || [];
-          const paginationData = response.data.data.pagination;
-          
-          // Process contacts - photos are now base64 data URLs from backend
-          const contactsWithPhotos = contactsData.map((contact) => ({
-            ...contact,
-            photo: contact.photo || null
-          }));
-          
-          setContacts(contactsWithPhotos);
-          setTotalContacts(paginationData?.total || contactsData.length);
-        } else {
-          setError(response.data.message || 'Failed to fetch contacts');
-        }
-      } catch (err) {
-        setError(err.response?.data?.message || 'Failed to fetch contacts');
+      console.log('Fetching contacts with params:', params);
+      const response = await contactsApi.getContacts(params);
+      
+      if (response.data.success) {
+        const contactsData = response.data.data.contacts || [];
+        const paginationData = response.data.data.pagination;
+        
+        console.log('Received contacts:', contactsData.length, 'contacts');
+        console.log('First contact sample:', contactsData[0]);
+        
+        // Process contacts - photos are now base64 data URLs from backend
+        const contactsWithPhotos = contactsData.map((contact) => ({
+          ...contact,
+          photo: contact.photo || null
+        }));
+        
+        console.log('Setting contacts in state:', contactsWithPhotos.length);
+        console.log('First contact after processing:', contactsWithPhotos[0]);
+        console.log('First contact photo exists:', !!contactsWithPhotos[0]?.photo);
+        setContacts(contactsWithPhotos);
+        setTotalContacts(paginationData?.total || contactsData.length);
+      } else {
+        setError(response.data.message || 'Failed to fetch contacts');
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to fetch contacts');
     } finally {
       setLoading(false);
     }
@@ -117,7 +128,47 @@ const UserDashboard = () => {
     setIsAddModalOpen(false);
   };
 
-  const handleSubmitAddContact = async (contactData) => {
+  const handleEditContact = (contact) => {
+    setEditingContact(contact);
+    setIsEditModalOpen(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false);
+    setEditingContact(null);
+  };
+
+  const handleDeleteContact = async (contactId) => {
+    try {
+      console.log('Deleting contact:', contactId);
+      const response = await contactsApi.deleteContact(contactId);
+      
+      console.log('Delete response:', response);
+      console.log('Delete response data:', response.data);
+      
+      // Handle successful delete (either 200 with success data or 204 no content)
+      if (response.status === 204 || (response.data && response.data.success)) {
+        // Refresh contacts list
+        fetchContacts();
+        
+        // Show success message
+        console.log('Contact deleted successfully');
+        alert('Contact deleted successfully!');
+      } else {
+        console.error('Delete failed - response:', response);
+        throw new Error(response.data?.message || 'Failed to delete contact');
+      }
+    } catch (error) {
+      console.error('Delete failed:', error);
+      console.error('Error response:', error.response);
+      console.error('Error response data:', error.response?.data);
+      
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to delete contact';
+      alert(`Delete failed: ${errorMessage}`);
+    }
+  };
+
+    const handleSubmitAddContact = async (contactData) => {
     try {
       setIsAddingContact(true);
       
@@ -130,23 +181,72 @@ const UserDashboard = () => {
         setCurrentPage(1); // Reset to first page
         fetchContacts();
         
-                 // Show success message (you can add a toast notification here)
-         return true; // Return success
-             } else {
-         // Handle validation errors from backend
-         if (response.data.message && Array.isArray(response.data.message)) {
-           console.error('Validation errors:', response.data.message);
-         }
-         throw new Error(response.data.message || 'Failed to add contact');
-       }
-     } catch (err) {
-       // Handle network errors
-       if (err.response?.data?.message) {
-         console.error('Backend error:', err.response.data.message);
-       }
-       throw err; // Re-throw to trigger form reset
-    } finally {
+                // Show success message (you can add a toast notification here)
+        return true; // Return success
+            } else {
+        // Handle validation errors from backend
+        if (response.data.message && Array.isArray(response.data.message)) {
+          console.error('Validation errors:', response.data.message);
+        }
+        throw new Error(response.data.message || 'Failed to add contact');
+      }
+    } catch (err) {
+      // Handle network errors
+      if (err.response?.data?.message) {
+        console.error('Backend error:', err.response.data.message);
+      }
+      throw err; // Re-throw to trigger form reset
+   } finally {
       setIsAddingContact(false);
+    }
+  };
+
+  const handleSubmitEditContact = async (contactId, contactData) => {
+    try {
+      setIsUpdatingContact(true);
+      
+      console.log('Updating contact:', contactId, contactData);
+      const response = await contactsApi.updateContact(contactId, contactData);
+      
+      if (response.data.success) {
+        console.log('Update response:', response.data);
+        console.log('Response data structure:', JSON.stringify(response.data, null, 2));
+        
+        // Update the contact in local state immediately
+        const updatedContact = response.data.data.contact;
+        console.log('Extracted updated contact:', updatedContact);
+        console.log('Updated contact photo:', !!updatedContact?.photo);
+        
+        if (updatedContact) {
+          setContacts(prevContacts => 
+            prevContacts.map(contact => 
+              contact.id === contactId ? updatedContact : contact
+            )
+          );
+        }
+        
+        // Also refresh contacts list to ensure consistency
+        console.log('Refreshing contacts list...');
+        await fetchContacts();
+        
+        // Show success message
+        console.log('Contact updated successfully');
+        return true;
+      } else {
+        // Handle validation errors from backend
+        if (response.data.message && Array.isArray(response.data.message)) {
+          console.error('Validation errors:', response.data.message);
+        }
+        throw new Error(response.data.message || 'Failed to update contact');
+      }
+    } catch (err) {
+      // Handle network errors
+      if (err.response?.data?.message) {
+        console.error('Backend error:', err.response.data.message);
+      }
+      throw err;
+    } finally {
+      setIsUpdatingContact(false);
     }
   };
 
@@ -256,7 +356,11 @@ const UserDashboard = () => {
            </div>
          ) : contacts.length > 0 ? (
            <>
-             <ContactsTable contacts={contacts} />
+                           <ContactsTable 
+                contacts={contacts} 
+                onEdit={handleEditContact}
+                onDelete={handleDeleteContact}
+              />
              
              {totalContacts > pageSize && (
                <div className="mt-4 sm:mt-6 flex justify-center sm:justify-end">
@@ -281,15 +385,24 @@ const UserDashboard = () => {
                    )}
         </main>
 
-        {/* Add Contact Modal */}
+                {/* Add Contact Modal */}
         <AddContactModal
           isOpen={isAddModalOpen}
           onClose={handleCloseAddModal}
           onSubmit={handleSubmitAddContact}
           loading={isAddingContact}
-                     onSuccess={() => {
-             // Form will be reset automatically by the modal
-           }}
+                      onSuccess={() => {
+              // Form will be reset automatically by the modal
+            }}
+        />
+
+        {/* Edit Contact Modal */}
+        <EditContactModal
+          isOpen={isEditModalOpen}
+          onClose={handleCloseEditModal}
+          contact={editingContact}
+          onSubmit={handleSubmitEditContact}
+          loading={isUpdatingContact}
         />
       </div>
     );

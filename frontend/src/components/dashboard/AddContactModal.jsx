@@ -194,10 +194,34 @@ const AddContactModal = ({ isOpen, onClose, onSubmit, loading, onSuccess }) => {
         }
       } catch (err) {
         console.error('Error creating contact:', err);
-        setErrors(prev => ({
-          ...prev,
-          photo: 'Failed to create contact. Please try again.'
-        }));
+        
+        // Handle backend validation errors
+        if (err.response?.data?.message) {
+          const errorMessage = err.response.data.message;
+          
+          if (Array.isArray(errorMessage)) {
+            // Handle array of validation errors
+            const newErrors = {};
+            errorMessage.forEach(msg => {
+              if (msg.includes('Name')) newErrors.name = msg;
+              else if (msg.includes('Email')) newErrors.email = msg;
+              else if (msg.includes('Phone')) newErrors.phone = msg;
+              else if (msg.includes('Photo')) newErrors.photo = msg;
+            });
+            setErrors(newErrors);
+          } else {
+            // Handle single error message
+            setErrors(prev => ({
+              ...prev,
+              photo: errorMessage
+            }));
+          }
+        } else {
+          setErrors(prev => ({
+            ...prev,
+            photo: 'Failed to create contact. Please try again.'
+          }));
+        }
       }
     }
   };

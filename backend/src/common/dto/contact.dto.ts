@@ -20,6 +20,7 @@ export class CreateContactDto {
     example: 'john@example.com',
   })
   @IsEmail({}, { message: 'Please provide a valid email address' })
+  @Matches(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, { message: 'Please provide a valid email address format' })
   @MaxLength(255, { message: 'Email cannot exceed 255 characters' })
   email: string;
 
@@ -43,10 +44,52 @@ export class CreateContactDto {
   photo?: Express.Multer.File;
 }
 
-export class UpdateContactDto extends CreateContactDto {
+export class UpdateContactDto {
+  @ApiProperty({
+    description: 'Contact name (optional for updates)',
+    example: 'Yash Gupta',
+    minLength: 2,
+    maxLength: 100,
+    required: false,
+  })
   @IsOptional()
-  @IsUUID()
-  id?: string;
+  @IsString({ message: 'Name must be a string' })
+  @MinLength(2, { message: 'Name must be at least 2 characters long' })
+  @MaxLength(100, { message: 'Name cannot exceed 100 characters' })
+  @Matches(/^[a-zA-Z\s]+$/, { message: 'Name can only contain letters and spaces' })
+  name?: string;
+
+  @ApiProperty({
+    description: 'Email address (optional for updates)',
+    example: 'john@example.com',
+    required: false,
+  })
+  @IsOptional()
+  @IsEmail({}, { message: 'Please provide a valid email address' })
+  @Matches(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, { message: 'Please provide a valid email address format' })
+  @MaxLength(255, { message: 'Email cannot exceed 255 characters' })
+  email?: string;
+
+  @ApiProperty({
+    description: 'Phone number (optional for updates)',
+    example: '+1234567890',
+    maxLength: 20,
+    required: false,
+  })
+  @IsOptional()
+  @IsString({ message: 'Phone must be a string' })
+  @MaxLength(20, { message: 'Phone cannot exceed 20 characters' })
+  @Matches(/^[\+]?[\d\s\-\(\)]{7,20}$/, { message: 'Please provide a valid phone number' })
+  phone?: string;
+
+  @ApiProperty({
+    description: 'Contact photo file (optional)',
+    type: 'string',
+    format: 'binary',
+    required: false,
+  })
+  @IsOptional()
+  photo?: Express.Multer.File;
 }
 
 export class ContactQueryDto {

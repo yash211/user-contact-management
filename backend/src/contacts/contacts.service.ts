@@ -129,17 +129,63 @@ export class ContactsService {
   ): Promise<Contact> {
     const contact = await this.findContactById(id, userId, targetUserId);
     
-    // Convert photo file to buffer if provided
+    console.log('Update Contact - Existing photo before update:', !!contact.photo);
+    console.log('Update Contact - DTO photo provided:', !!updateContactDto.photo);
+    console.log('Update Contact - DTO photo type:', typeof updateContactDto.photo);
+    console.log('Update Contact - DTO photo starts with data:image:', updateContactDto.photo && typeof updateContactDto.photo === 'string' ? (updateContactDto.photo as string).startsWith('data:image/') : 'N/A');
+    
+    // Convert photo file to buffer if provided, otherwise preserve existing photo
     if (updateContactDto.photo && 'buffer' in updateContactDto.photo) {
+      // New photo file uploaded
       contact.photo = updateContactDto.photo.buffer;
+      console.log('Update Contact - New photo set');
+    } else if (updateContactDto.photo && typeof updateContactDto.photo === 'string' && (updateContactDto.photo as string).startsWith('data:image/')) {
+      // Existing photo data sent from frontend - preserve it
+      console.log('Update Contact - Existing photo data received, preserving');
+      // Don't change contact.photo - keep the existing buffer
+    } else if (updateContactDto.photo === undefined || updateContactDto.photo === null) {
+      console.log('Update Contact - No photo provided, preserving existing photo');
+      // Explicitly don't change contact.photo - keep the existing buffer
+    } else {
+      console.log('Update Contact - Unexpected photo type, preserving existing photo');
+      console.log('Update Contact - Photo data type:', typeof updateContactDto.photo);
+      // Don't change contact.photo - keep the existing buffer
     }
     
-    // Update other fields
-    if (updateContactDto.name) contact.name = updateContactDto.name;
-    if (updateContactDto.email) contact.email = updateContactDto.email;
-    if (updateContactDto.phone) contact.phone = updateContactDto.phone;
+    // Create an update object with only the fields that should be updated
+    const updateData: Partial<Contact> = {};
     
-    const savedContact = await this.contactRepository.save(contact);
+    // Update other fields only if provided
+    if (updateContactDto.name !== undefined) {
+      contact.name = updateContactDto.name;
+      updateData.name = updateContactDto.name;
+    }
+    if (updateContactDto.email !== undefined) {
+      contact.email = updateContactDto.email;
+      updateData.email = updateContactDto.email;
+    }
+    if (updateContactDto.phone !== undefined) {
+      contact.phone = updateContactDto.phone;
+      updateData.phone = updateContactDto.phone;
+    }
+    
+    // Only update photo if a new one was provided (not undefined, not null)
+    if (updateContactDto.photo && 'buffer' in updateContactDto.photo) {
+      contact.photo = updateContactDto.photo.buffer;
+      updateData.photo = updateContactDto.photo.buffer;
+    }
+    // If photo is undefined or null, don't include it in updateData at all
+    
+    console.log('Update Contact - Photo after field updates:', !!contact.photo);
+    console.log('Update Contact - Fields being updated:', Object.keys(updateData));
+    
+    // Use update instead of save to avoid updating fields we don't want to change
+    await this.contactRepository.update(contact.id, updateData);
+    
+    // Return the updated contact
+    const savedContact = await this.findContactById(contact.id, userId, targetUserId);
+    console.log('Update Contact - Photo after save:', !!savedContact.photo);
+    
     return transformContactPhoto(savedContact);
   }
 

@@ -1,14 +1,14 @@
 import React from 'react';
 
-const ContactsTable = ({ contacts }) => {
-  const handleEdit = (contactId) => {
-    // TODO: Implement edit functionality
-    console.log('Edit contact:', contactId);
+const ContactsTable = ({ contacts, onEdit, onDelete }) => {
+  const handleEdit = (contact) => {
+    onEdit(contact);
   };
 
-  const handleDelete = (contactId) => {
-    // TODO: Implement delete functionality
-    console.log('Delete contact:', contactId);
+  const handleDelete = (contact) => {
+    if (window.confirm(`Are you sure you want to delete ${contact.name}?`)) {
+      onDelete(contact.id);
+    }
   };
 
     return (
@@ -83,7 +83,7 @@ const ContactsTable = ({ contacts }) => {
                 <td className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 whitespace-nowrap text-sm font-medium">
                   <div className="flex items-center space-x-2 sm:space-x-3">
                     <button
-                      onClick={() => handleEdit(contact.id)}
+                      onClick={() => handleEdit(contact)}
                       className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-all duration-200 hover:scale-110"
                       title="Edit contact"
                     >
@@ -93,7 +93,7 @@ const ContactsTable = ({ contacts }) => {
                     </button>
 
                     <button
-                      onClick={() => handleDelete(contact.id)}
+                      onClick={() => handleDelete(contact)}
                       className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-all duration-200 hover:scale-110"
                       title="Delete contact"
                     >
@@ -148,7 +148,7 @@ const ContactsTable = ({ contacts }) => {
               
               <div className="flex items-center space-x-2">
                 <button
-                  onClick={() => handleEdit(contact.id)}
+                  onClick={() => handleEdit(contact)}
                   className="p-2 text-blue-600 hover:bg-blue-100 rounded-lg transition-all duration-200"
                   title="Edit contact"
                 >
@@ -158,7 +158,7 @@ const ContactsTable = ({ contacts }) => {
                 </button>
 
                 <button
-                  onClick={() => handleDelete(contact.id)}
+                  onClick={() => handleDelete(contact)}
                   className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-all duration-200"
                   title="Delete contact"
                 >

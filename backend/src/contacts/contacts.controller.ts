@@ -131,7 +131,7 @@ export class ContactsController {
     type: ErrorResponseDto,
   })
   async createContact(
-    @Body(ValidationPipe) createContactDto: CreateContactDto,
+    @Body() createContactDto: CreateContactDto,
     @UploadedFile() photo?: Express.Multer.File,
     @Request() req?,
     @Query('userId') targetUserId?: string,
@@ -231,7 +231,7 @@ export class ContactsController {
     type: ErrorResponseDto,
   })
   async getAllContacts(
-    @Query(ValidationPipe) paginationDto: ContactPaginationDto,
+    @Query() paginationDto: ContactPaginationDto,
     @Query('search') search?: string,
     @Query('userId') targetUserId?: string,
     @Request() req?,
@@ -345,7 +345,7 @@ export class ContactsController {
     type: ErrorResponseDto,
   })
   async getAllContactsForAdmin(
-    @Query(ValidationPipe) paginationDto: ContactPaginationDto,
+    @Query() paginationDto: ContactPaginationDto,
     @Query('search') search?: string,
     @Request() req?,
   ) {
@@ -442,8 +442,10 @@ export class ContactsController {
   }
 
   @Put(API_ROUTES.CONTACTS.UPDATE)
-  @ApiOperation({ summary: 'Update a specific contact with optional photo URL' })
+  @UseInterceptors(FileInterceptor('photo'))
+  @ApiOperation({ summary: 'Update an existing contact with optional photo file' })
   @ApiParam({ name: 'id', description: 'Contact ID (UUID)' })
+  @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
       type: 'object',
@@ -453,8 +455,8 @@ export class ContactsController {
         phone: { type: 'string', example: '+1234567890' },
         photo: {
           type: 'string',
-          description: 'Contact photo URL (optional)',
-          example: '/uploads/contacts/filename.jpg',
+          format: 'binary',
+          description: 'Contact photo file (optional)',
         },
       },
     },
@@ -477,7 +479,7 @@ export class ContactsController {
                 name: { type: 'string', example: 'Yash Gupta' },
                 email: { type: 'string', example: 'john@example.com' },
                 phone: { type: 'string', example: '+1234567890' },
-                photo: { type: 'string', example: '/uploads/contacts/filename.jpg' },
+                photo: { type: 'string', example: 'data:image/jpeg;base64,...' },
                 createdAt: { type: 'string', example: '2024-01-01T00:00:00.000Z' },
                 updatedAt: { type: 'string', example: '2024-01-01T00:00:00.000Z' },
               },
@@ -504,18 +506,56 @@ export class ContactsController {
     description: 'Unauthorized - invalid or missing token',
     type: ErrorResponseDto,
   })
-  @Put(API_ROUTES.CONTACTS.UPDATE)
-  @UseInterceptors(FileInterceptor('photo'))
-  @ApiOperation({ summary: 'Update an existing contact with optional photo file' })
-  @ApiConsumes('multipart/form-data')
   async updateContact(
     @Param('id') id: string,
-    @Body(ValidationPipe) updateContactDto: UpdateContactDto,
+    @Body() updateContactDto: UpdateContactDto,
     @UploadedFile() photo?: Express.Multer.File,
     @Request() req?,
     @Query('userId') targetUserId?: string,
   ) {
+    // Manual validation for update operations
+    if (updateContactDto.name !== undefined && updateContactDto.name !== null) {
+      if (typeof updateContactDto.name !== 'string') {
+        throw new BadRequestException('Name must be a string');
+      }
+      if (updateContactDto.name.trim().length < 2) {
+        throw new BadRequestException('Name must be at least 2 characters long');
+      }
+      if (updateContactDto.name.trim().length > 100) {
+        throw new BadRequestException('Name cannot exceed 100 characters');
+      }
+      if (!/^[a-zA-Z\s]+$/.test(updateContactDto.name.trim())) {
+        throw new BadRequestException('Name can only contain letters and spaces');
+      }
+    }
+
+    if (updateContactDto.email !== undefined && updateContactDto.email !== null) {
+      if (typeof updateContactDto.email !== 'string') {
+        throw new BadRequestException('Email must be a string');
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(updateContactDto.email.trim())) {
+        throw new BadRequestException('Please provide a valid email address format');
+      }
+      if (updateContactDto.email.length > 255) {
+        throw new BadRequestException('Email cannot exceed 255 characters');
+      }
+    }
+
+    if (updateContactDto.phone !== undefined && updateContactDto.phone !== null) {
+      if (typeof updateContactDto.phone !== 'string') {
+        throw new BadRequestException('Phone must be a string');
+      }
+      if (!/^[\+]?[\d\s\-\(\)]{7,20}$/.test(updateContactDto.phone.trim())) {
+        throw new BadRequestException('Please provide a valid phone number');
+      }
+      if (updateContactDto.phone.length > 20) {
+        throw new BadRequestException('Phone number cannot exceed 20 characters');
+      }
+    }
     try {
+      console.log('Update Contact - Received DTO:', updateContactDto);
+      console.log('Update Contact - Validation passed, proceeding with update');
+      
       const isAdmin = req.user.role === UserRole.ADMIN;
       
       if (targetUserId && !isAdmin) {
@@ -527,7 +567,12 @@ export class ContactsController {
         // Validate photo file
         this.validatePhotoFile(photo);
         updateContactDto.photo = photo;
+      } else {
+        // Explicitly remove photo field if no file uploaded to avoid undefined
+        delete updateContactDto.photo;
       }
+      
+      console.log('Update Contact - Processed DTO:', updateContactDto);
       
       const contact = await this.contactsService.updateContact(
         id,
@@ -542,6 +587,7 @@ export class ContactsController {
         `${API_ROUTES.CONTACTS.BASE}/${id}`,
       );
     } catch (error) {
+      console.error('Update Contact - Error:', error);
       throw error;
     }
   }
