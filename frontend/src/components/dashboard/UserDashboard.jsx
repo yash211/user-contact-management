@@ -8,11 +8,13 @@ import ContactsTable from './ContactsTable';
 import Pagination from '../common/Pagination';
 import AddContactModal from './AddContactModal';
 import EditContactModal from './EditContactModal';
+import Users from './Users';
 
 
 const UserDashboard = () => {
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
+  const [activeTab, setActiveTab] = useState('contacts');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(5);
   const [filters, setFilters] = useState({
@@ -335,15 +337,46 @@ const UserDashboard = () => {
       />
       
              <main className="max-w-7xl mx-auto py-4 sm:py-6 lg:py-8 px-3 sm:px-4 lg:px-6 xl:px-8">
-        <ContactFilters 
-          filters={filters}
-          onFilterChange={handleFilterChange}
-          onExportCSV={handleExportCSV}
-          sortBy={sortBy}
-          sortOrder={sortOrder}
-          onSortChange={handleSortChange}
-          onAddContact={handleAddContact}
-        />
+        {/* Tab Navigation */}
+        <div className="mb-6">
+          <nav className="flex space-x-8" aria-label="Tabs">
+            <button
+              onClick={() => setActiveTab('contacts')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'contacts'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Contacts
+            </button>
+            {user?.role === 'admin' && (
+              <button
+                onClick={() => setActiveTab('users')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'users'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Users
+              </button>
+            )}
+          </nav>
+        </div>
+
+        {/* Contacts Tab Content */}
+        {activeTab === 'contacts' && (
+          <>
+            <ContactFilters 
+              filters={filters}
+              onFilterChange={handleFilterChange}
+              onExportCSV={handleExportCSV}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              onSortChange={handleSortChange}
+              onAddContact={handleAddContact}
+            />
         
 
         
@@ -404,7 +437,14 @@ const UserDashboard = () => {
              <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2 sm:mb-3">No contacts found</h3>
              <p className="text-gray-600 text-base sm:text-lg">Try adjusting your search criteria to find contacts.</p>
            </div>
-                   )}
+         )}
+           </>
+         )}
+
+        {/* Users Tab Content */}
+        {activeTab === 'users' && user?.role === 'admin' && (
+          <Users />
+        )}
         </main>
 
                 {/* Add Contact Modal */}

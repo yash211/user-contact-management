@@ -3,6 +3,11 @@ export const MESSAGES = {
   SUCCESS: {
     USER_REGISTERED: 'User registered successfully',
     USER_LOGGED_IN: 'User logged in successfully',
+    USER_CREATED: 'User created successfully',
+    USER_RETRIEVED: 'User retrieved successfully',
+    USERS_RETRIEVED: 'Users retrieved successfully',
+    USER_UPDATED: 'User updated successfully',
+    USER_DELETED: 'User deleted successfully',
     CONTACT_CREATED: 'Contact created successfully',
     CONTACT_RETRIEVED: 'Contact retrieved successfully',
     CONTACTS_RETRIEVED: 'Contacts retrieved successfully',
