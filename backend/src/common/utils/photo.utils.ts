@@ -25,8 +25,20 @@ export function base64ToBuffer(base64: string | null): Buffer | null {
  * Transform contact photo data for API response
  */
 export function transformContactPhoto(contact: any): any {
-  if (contact.photo && Buffer.isBuffer(contact.photo)) {
-    contact.photo = bufferToBase64(contact.photo);
+  if (contact && contact.photo) {
+    try {
+      // Handle Buffer-like object from PostgreSQL
+      if (contact.photo && typeof contact.photo === 'object' && contact.photo.type === 'Buffer' && Array.isArray(contact.photo.data)) {
+        const buffer = Buffer.from(contact.photo.data);
+        contact.photo = bufferToBase64(buffer);
+      }
+      // Handle actual Buffer
+      else if (Buffer.isBuffer(contact.photo)) {
+        contact.photo = bufferToBase64(contact.photo);
+      }
+    } catch (error) {
+      contact.photo = null;
+    }
   }
   return contact;
 }

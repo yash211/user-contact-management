@@ -37,60 +37,57 @@ api.interceptors.response.use(
   }
 );
 
-export const authApi = {
+const authApi = {
   login: (credentials) => api.post('/auth/login', credentials),
   register: (userData) => api.post('/auth/register', userData),
   logout: () => api.post('/auth/logout'),
   refreshToken: () => api.post('/auth/refresh'),
 };
 
-export const contactsApi = {
+const contactsApi = {
   getContacts: (params) => api.get('/contacts', { params }),
+  getAllContactsForAdmin: (params) => api.get('/contacts/admin/all', { params }),
+  getContact: (id) => api.get(`/contacts/${id}`),
   createContact: (contactData) => {
-    // If there's a photo file, create FormData for multipart upload
-    if (contactData.photo && contactData.photo instanceof File) {
-      const formData = new FormData();
-      formData.append('name', contactData.name);
-      formData.append('email', contactData.email);
-      formData.append('phone', contactData.phone);
-      formData.append('photo', contactData.photo);
-      
-      return api.post('/contacts', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-    }
-    
-    // Otherwise, send as JSON
-    return api.post('/contacts', contactData);
+    const formData = new FormData();
+    Object.keys(contactData).forEach(key => {
+      if (contactData[key] !== null && contactData[key] !== undefined) {
+        formData.append(key, contactData[key]);
+      }
+    });
+    return api.post('/contacts', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
   },
-  updateContact: (id, contactData) => {
-    // If there's a photo file, create FormData for multipart upload
-    if (contactData.photo && contactData.photo instanceof File) {
-      const formData = new FormData();
-      formData.append('name', contactData.name);
-      formData.append('email', contactData.email);
-      formData.append('phone', contactData.phone);
-      formData.append('photo', contactData.photo);
-      
-      return api.put(`/contacts/${id}`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-    }
-    
-    // Otherwise, send as JSON
-    return api.put(`/contacts/${id}`, contactData);
+  updateContact: (id, contactData, targetUserId = null) => {
+    const params = {};
+    if (targetUserId) { params.userId = targetUserId; }
+    const formData = new FormData();
+    Object.keys(contactData).forEach(key => {
+      if (contactData[key] !== null && contactData[key] !== undefined) {
+        formData.append(key, contactData[key]);
+      }
+    });
+    return api.put(`/contacts/${id}`, formData, { params });
   },
-  deleteContact: (id) => api.delete(`/contacts/${id}`),
-  exportContacts: (params) => api.get('/contacts/export/csv', { 
-    params,
-    responseType: 'blob' // Important for file download
-  }),
+  deleteContact: (id, targetUserId = null) => {
+    const params = {};
+    if (targetUserId) { params.userId = targetUserId; }
+    return api.delete(`/contacts/${id}`, { params });
+  },
+  exportContacts: (params) => api.get('/contacts/export', { params, responseType: 'blob' }),
 };
 
+const usersApi = {
+  getUsers: (params) => api.get('/users', { params }),
+  getUser: (id) => api.get(`/users/${id}`),
+  createUser: (userData) => api.post('/users', userData),
+  deleteUser: (id) => api.delete(`/users/${id}`),
+};
+
+export { authApi, contactsApi, usersApi };
 
 
 export const tokenService = {

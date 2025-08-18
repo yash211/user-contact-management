@@ -14,13 +14,14 @@ function App() {
             <Route path="/auth" element={<AuthPage />} />
 
             <Route 
-              path="/user-dashboard" 
+              path="/dashboard" 
               element={
-                <ProtectedRoute requiredRole="user">
+                <ProtectedRoute>
                   <UserDashboard />
                 </ProtectedRoute>
               } 
             />
+
             <Route path="/" element={<Navigate to="/auth" replace />} />
             <Route path="*" element={<Navigate to="/auth" replace />} />
           </Routes>

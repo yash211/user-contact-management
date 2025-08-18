@@ -8,20 +8,13 @@ import homepageImage from '../../assets/homepage.png';
 const AuthPage = () => {
   const [isLogin, setIsLogin] = useState(true);
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useSelector((state) => state.auth);
+  const { isAuthenticated } = useSelector((state) => state.auth);
 
   useEffect(() => {
     if (isAuthenticated) {
-      console.log('User authenticated:', user);
-      if (user && user.role === 'user') {
-        console.log('Redirecting to user dashboard');
-        navigate('/user-dashboard');
-      } else {
-        console.log('Redirecting to user dashboard (default)');
-        navigate('/user-dashboard');
-      }
+      navigate('/dashboard');
     }
-  }, [isAuthenticated, user, navigate]);
+  }, [isAuthenticated, navigate]);
 
   const toggleForm = () => {
     setIsLogin(!isLogin);

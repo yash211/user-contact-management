@@ -1,7 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, BeforeInsert, BeforeUpdate } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, BeforeInsert, BeforeUpdate, OneToMany } from 'typeorm';
 import { Exclude } from 'class-transformer';
 import * as bcrypt from 'bcryptjs';
 import { APP_CONSTANTS } from '../constants';
+import { Contact } from './contact.entity';
 
 export enum UserRole {
   USER = 'user',
@@ -44,6 +45,9 @@ export class User {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @OneToMany(() => Contact, contact => contact.user)
+  contacts: Contact[];
 
   @BeforeInsert()
   @BeforeUpdate()

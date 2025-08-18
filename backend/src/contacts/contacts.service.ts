@@ -50,7 +50,9 @@ export class ContactsService {
     });
     
     const savedContact = await this.contactRepository.save(contact);
-    return transformContactPhoto(savedContact);
+    // Temporarily disable photo transformation to debug the issue
+    // return transformContactPhoto(savedContact);
+    return savedContact;
   }
 
   async findAllContacts(
@@ -58,55 +60,62 @@ export class ContactsService {
     options: ContactPaginationOptions,
     targetUserId?: string,
   ): Promise<PaginatedContactsResponse> {
-    const { page = 1, limit = 10, search, sortBy = 'createdAt', sortOrder = 'DESC' } = options;
-    
-    if (page < 1) throw new BadRequestException('Page must be greater than 0');
-    if (limit < 1 || limit > 100) throw new BadRequestException('Limit must be between 1 and 100');
+    try {
+      const { page = 1, limit = 10, search, sortBy = 'createdAt', sortOrder = 'DESC' } = options;
+      
+      if (page < 1) throw new BadRequestException('Page must be greater than 0');
+      if (limit < 1 || limit > 100) throw new BadRequestException('Limit must be between 1 and 100');
 
-    const queryUserId = targetUserId || userId;
-    let queryBuilder: SelectQueryBuilder<Contact> = this.contactRepository
-      .createQueryBuilder('contact')
-      .where('contact.userId = :userId', { userId: queryUserId });
+      const queryUserId = targetUserId || userId;
+      let queryBuilder: SelectQueryBuilder<Contact> = this.contactRepository
+        .createQueryBuilder('contact')
+        .leftJoinAndSelect('contact.user', 'user')
+        .addSelect(['user.id', 'user.name', 'user.email'])
+        .where('contact.userId = :userId', { userId: queryUserId });
 
-    if (search) {
-      queryBuilder = queryBuilder.andWhere(
-        '(contact.name ILIKE :search OR contact.email ILIKE :search OR contact.phone ILIKE :search)',
-        { search: `%${search}%` }
-      );
+      if (search) {
+        queryBuilder = queryBuilder.andWhere(
+          '(contact.name ILIKE :search OR contact.email ILIKE :search OR contact.phone ILIKE :search)',
+          { search: `%${search}%` }
+        );
+      }
+
+      const allowedSortFields = ['name', 'email', 'phone', 'createdAt', 'updatedAt'];
+      if (allowedSortFields.includes(sortBy)) {
+        queryBuilder = queryBuilder.orderBy(`contact.${sortBy}`, sortOrder);
+      } else {
+        queryBuilder = queryBuilder.orderBy('contact.createdAt', 'DESC');
+      }
+
+      const total = await queryBuilder.getCount();
+
+      const skip = (page - 1) * limit;
+      queryBuilder = queryBuilder.skip(skip).take(limit);
+
+      const contacts = await queryBuilder.getMany();
+
+      // Transform photo data for API response
+      const transformedContacts = transformContactsPhotos(contacts);
+
+      const totalPages = Math.ceil(total / limit);
+      const hasNext = page < totalPages;
+      const hasPrev = page > 1;
+
+      return {
+        contacts: transformedContacts,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasNext,
+          hasPrev,
+        },
+      };
+    } catch (error) {
+      console.error('Error in findAllContacts:', error);
+      throw error;
     }
-
-    const allowedSortFields = ['name', 'email', 'phone', 'createdAt', 'updatedAt'];
-    if (allowedSortFields.includes(sortBy)) {
-      queryBuilder = queryBuilder.orderBy(`contact.${sortBy}`, sortOrder);
-    } else {
-      queryBuilder = queryBuilder.orderBy('contact.createdAt', 'DESC');
-    }
-
-    const total = await queryBuilder.getCount();
-
-    const skip = (page - 1) * limit;
-    queryBuilder = queryBuilder.skip(skip).take(limit);
-
-    const contacts = await queryBuilder.getMany();
-
-    // Transform photo data for API response
-    const transformedContacts = transformContactsPhotos(contacts);
-
-    const totalPages = Math.ceil(total / limit);
-    const hasNext = page < totalPages;
-    const hasPrev = page > 1;
-
-    return {
-      contacts: transformedContacts,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages,
-        hasNext,
-        hasPrev,
-      },
-    };
   }
 
   async findContactById(id: string, userId: string, targetUserId?: string): Promise<Contact> {
@@ -118,7 +127,9 @@ export class ContactsService {
       throw new NotFoundException('Contact not found');
     }
 
-    return transformContactPhoto(contact);
+    // Temporarily disable photo transformation to debug the issue
+    // return transformContactPhoto(contact);
+    return contact;
   }
 
   async updateContact(
@@ -186,7 +197,9 @@ export class ContactsService {
     const savedContact = await this.findContactById(contact.id, userId, targetUserId);
     console.log('Update Contact - Photo after save:', !!savedContact.photo);
     
-    return transformContactPhoto(savedContact);
+    // Temporarily disable photo transformation to debug the issue
+    // return transformContactPhoto(savedContact);
+    return savedContact;
   }
 
   async deleteContact(id: string, userId: string, targetUserId?: string): Promise<void> {
@@ -229,12 +242,15 @@ export class ContactsService {
 
     const contacts = await queryBuilder.getMany();
 
+    // Transform photo data for API response
+    const transformedContacts = transformContactsPhotos(contacts);
+
     const totalPages = Math.ceil(total / limit);
     const hasNext = page < totalPages;
     const hasPrev = page > 1;
 
     return {
-      contacts,
+      contacts: transformedContacts,
       pagination: {
         page,
         limit,
@@ -246,11 +262,16 @@ export class ContactsService {
     };
   }
 
-  async exportContactsToCsv(userId: string, targetUserId?: string, options?: { search?: string; sortBy?: string; sortOrder?: 'ASC' | 'DESC' }): Promise<{ contacts: any[], headers: string[] }> {
+  async exportContactsToCsv(userId: string, targetUserId?: string, options?: { search?: string; sortBy?: string; sortOrder?: 'ASC' | 'DESC'; isAdmin?: boolean }): Promise<{ contacts: any[], headers: string[] }> {
     let queryBuilder: SelectQueryBuilder<Contact> = this.contactRepository
-      .createQueryBuilder('contact')
-      .leftJoinAndSelect('contact.user', 'user')
-      .addSelect(['user.id', 'user.name', 'user.email']);
+      .createQueryBuilder('contact');
+
+    // Only join user table if admin is exporting
+    if (options?.isAdmin) {
+      queryBuilder = queryBuilder
+        .leftJoinAndSelect('contact.user', 'user')
+        .addSelect(['user.id', 'user.name', 'user.email']);
+    }
 
     if (targetUserId) {
       queryBuilder = queryBuilder.where('contact.userId = :userId', { userId: targetUserId });
@@ -275,12 +296,25 @@ export class ContactsService {
 
     const contacts = await queryBuilder.getMany();
 
-    const headers = ['Name', 'Email', 'Phone'];
-    const records = contacts.map(contact => ({
-      name: contact.name,
-      email: contact.email || '',
-      phone: contact.phone || '',
-    }));
+    // Transform photo data before processing
+    // Temporarily disable photo transformation to debug the issue
+    // const transformedContacts = transformContactsPhotos(contacts);
+    const transformedContacts = contacts;
+
+    const headers = options?.isAdmin ? ['Name', 'Email', 'Phone', 'User Associated With'] : ['Name', 'Email', 'Phone'];
+    const records = transformedContacts.map(contact => {
+      const record: any = {
+        name: contact.name,
+        email: contact.email || '',
+        phone: contact.phone || '',
+      };
+      
+      if (options?.isAdmin) {
+        record.user = contact.user?.name || 'N/A';
+      }
+      
+      return record;
+    });
 
     return { contacts: records, headers };
   }
@@ -308,11 +342,17 @@ export class ContactsService {
 
     const contacts = await queryBuilder.getMany();
 
-    const headers = ['Name', 'Email', 'Phone'];
-    const records = contacts.map(contact => ({
+    // Transform photo data before processing
+    // Temporarily disable photo transformation to debug the issue
+    // const transformedContacts = transformContactsPhotos(contacts);
+    const transformedContacts = contacts;
+
+    const headers = ['Name', 'Email', 'Phone', 'User Associated With'];
+    const records = transformedContacts.map(contact => ({
       name: contact.name,
       email: contact.email || '',
       phone: contact.phone || '',
+      user: contact.user?.name || 'N/A',
     }));
 
     return { contacts: records, headers };
