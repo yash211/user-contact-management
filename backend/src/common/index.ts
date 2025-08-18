@@ -7,8 +7,7 @@ export * from './dto';
 // Entities
 export * from './entities';
 
-// File Upload
-export * from './file-upload';
+
 
 // Filters
 export * from './filters';

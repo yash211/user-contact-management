@@ -1,6 +1,5 @@
-import { Controller, Post, Get, Body, HttpCode, HttpStatus, ValidationPipe, UseGuards, Request, BadRequestException, UseInterceptors, UploadedFile, ParseFilePipe, MaxFileSizeValidator, FileTypeValidator, Param, Delete, Put } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiConsumes, ApiParam } from '@nestjs/swagger';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { Controller, Post, Get, Body, HttpCode, HttpStatus, ValidationPipe, UseGuards, Request, BadRequestException, Param, Delete, Put } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiParam } from '@nestjs/swagger';
 import { AuthService, AuthResponse } from './auth.service';
 import { RegisterDto, LoginDto, API_TAGS, API_ROUTES, MESSAGES } from '../common';
 import { UserRole } from '../common/entities';
@@ -8,22 +7,17 @@ import { ResponseBuilder } from '../common/interfaces';
 import { JwtAuthGuard, RolesGuard } from './guards';
 import { Roles } from './decorators';
 import { SuccessResponseDto, ErrorResponseDto } from '../common/dto/response.dto';
-import { FileUploadService } from '../common/file-upload';
-import type { UploadedFile as UploadedFileType } from '../common/file-upload';
 
 @ApiTags(API_TAGS.AUTH)
 @Controller(API_ROUTES.AUTH.BASE)
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
-    private readonly fileUploadService: FileUploadService,
   ) {}
 
   @Post(API_ROUTES.AUTH.REGISTER)
-  @UseInterceptors(FileInterceptor('photo', { storage: undefined }))
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Register a new user with optional photo' })
-  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Register a new user' })
   @ApiBody({
     schema: {
       type: 'object',
@@ -33,11 +27,6 @@ export class AuthController {
         password: { type: 'string', example: 'password123' },
         phone: { type: 'string', example: '+1234567890' },
         role: { type: 'string', enum: ['user', 'admin'], example: 'user' },
-        photo: {
-          type: 'string',
-          format: 'binary',
-          description: 'User profile photo file (JPEG, PNG, GIF, WebP)',
-        },
       },
       required: ['name', 'email', 'password'],
     },
@@ -50,22 +39,21 @@ export class AuthController {
       properties: {
         success: { type: 'boolean', example: true },
         message: { type: 'string', example: 'User registered successfully' },
-        data: {
-          type: 'object',
-          properties: {
-            user: {
+                    data: {
               type: 'object',
               properties: {
-                id: { type: 'string', example: 'uuid-here' },
-                name: { type: 'string', example: 'Yash Gupta' },
-                email: { type: 'string', example: 'john@example.com' },
-                role: { type: 'string', example: 'user' },
-                photo: { type: 'string', example: '/uploads/users/filename.jpg' },
-                isActive: { type: 'boolean', example: true },
-                createdAt: { type: 'string', example: '2024-01-01T00:00:00.000Z' },
-                updatedAt: { type: 'string', example: '2024-01-01T00:00:00.000Z' }
-              }
-            },
+                user: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string', example: 'uuid-here' },
+                    name: { type: 'string', example: 'Yash Gupta' },
+                    email: { type: 'string', example: 'john@example.com' },
+                    role: { type: 'string', example: 'user' },
+                    isActive: { type: 'boolean', example: true },
+                    createdAt: { type: 'string', example: '2024-01-01T00:00:00.000Z' },
+                    updatedAt: { type: 'string', example: '2024-01-01T00:00:00.000Z' }
+                  }
+                },
             accessToken: { type: 'string', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' }
           }
         },
@@ -86,38 +74,9 @@ export class AuthController {
   })
   async register(
     @Body(ValidationPipe) registerDto: RegisterDto,
-    @UploadedFile(
-      new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
-          new FileTypeValidator({ fileType: '.(jpg|jpeg|png|gif|webp)' }),
-        ],
-        fileIsRequired: false,
-      }),
-    )
-    photo?: UploadedFileType,
   ) {
     try {
-      let photoUrl: string | undefined = undefined;
-      
-      if (photo) {
-        this.fileUploadService.validateFile(photo);
-        
-        const storageConfig = this.fileUploadService.getStorageConfig('users');
-        const multer = require('multer');
-        const upload = multer(storageConfig);
-        
-        const processedFile = await new Promise<UploadedFileType>((resolve, reject) => {
-          upload.single('photo')({}, {}, (err) => {
-            if (err) reject(err);
-            else resolve(processedFile);
-          });
-        });
-
-        photoUrl = this.fileUploadService.getFileUrl(processedFile.filename, 'users');
-      }
-      
-      const result = await this.authService.register({ ...registerDto, photo: photoUrl });
+      const result = await this.authService.register(registerDto);
       return ResponseBuilder.success(
         result,
         MESSAGES.SUCCESS.USER_REGISTERED,
@@ -278,10 +237,8 @@ export class AuthController {
 
   @Put('profile')
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FileInterceptor('photo', { storage: undefined }))
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update user profile with optional photo' })
-  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Update user profile' })
   @ApiBody({
     schema: {
       type: 'object',
@@ -289,11 +246,6 @@ export class AuthController {
         name: { type: 'string', example: 'Yash Gupta' },
         email: { type: 'string', example: 'john@example.com' },
         phone: { type: 'string', example: '+1234567890' },
-        photo: {
-          type: 'string',
-          format: 'binary',
-          description: 'User profile photo file (JPEG, PNG, GIF, WebP)',
-        },
       },
     },
   })
@@ -315,7 +267,6 @@ export class AuthController {
                 name: { type: 'string', example: 'Yash Gupta' },
                 email: { type: 'string', example: 'john@example.com' },
                 role: { type: 'string', example: 'user' },
-                photo: { type: 'string', example: '/uploads/users/filename.jpg' },
                 isActive: { type: 'boolean', example: true },
                 createdAt: { type: 'string', example: '2024-01-01T00:00:00.000Z' },
                 updatedAt: { type: 'string', example: '2024-01-01T00:00:00.000Z' }
@@ -340,49 +291,11 @@ export class AuthController {
   })
   async updateProfile(
     @Body(ValidationPipe) updateProfileDto: any,
-    @UploadedFile(
-      new ParseFilePipe({
-        validators: [
-          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), // 5MB
-          new FileTypeValidator({ fileType: '.(jpg|jpeg|png|gif|webp)' }),
-        ],
-        fileIsRequired: false,
-      }),
-    )
-    photo?: UploadedFileType,
     @Request() req?,
   ) {
     try {
-      let photoUrl: string | undefined = updateProfileDto.photo;
-      
-      if (photo) {
-        this.fileUploadService.validateFile(photo);
-        
-        // Delete old photo if exists
-        const user = await this.authService.findUserById(req.user.id);
-        if (user.photo) {
-          const filename = user.photo.split('/').pop();
-          if (filename) {
-            await this.fileUploadService.deleteFile(filename, 'users');
-          }
-        }
-        
-        const storageConfig = this.fileUploadService.getStorageConfig('users');
-        const multer = require('multer');
-        const upload = multer(storageConfig);
-        
-        const processedFile = await new Promise<UploadedFileType>((resolve, reject) => {
-          upload.single('photo')(req, {}, (err) => {
-            if (err) reject(err);
-            else resolve(req.file);
-          });
-        });
-
-        photoUrl = this.fileUploadService.getFileUrl(processedFile.filename, 'users');
-      }
-      
       // Update user profile
-      const updatedUser = await this.authService.updateUserProfile(req.user.id, { ...updateProfileDto, photo: photoUrl });
+      const updatedUser = await this.authService.updateUserProfile(req.user.id, updateProfileDto);
       
       return ResponseBuilder.success(
         { user: updatedUser },

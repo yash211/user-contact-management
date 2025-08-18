@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsOptional, MinLength, MaxLength, IsUUID, IsInt, Min, Max, IsIn } from 'class-validator';
+import { IsString, IsEmail, IsOptional, MinLength, MaxLength, IsUUID, IsInt, Min, Max, IsIn, Matches, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -9,41 +9,38 @@ export class CreateContactDto {
     minLength: 2,
     maxLength: 100,
   })
-  @IsString()
+  @IsString({ message: 'Name must be a string' })
   @MinLength(2, { message: 'Name must be at least 2 characters long' })
   @MaxLength(100, { message: 'Name cannot exceed 100 characters' })
+  @Matches(/^[a-zA-Z\s]+$/, { message: 'Name can only contain letters and spaces' })
   name: string;
 
   @ApiProperty({
-    description: 'Email address (optional)',
+    description: 'Email address (required)',
     example: 'john@example.com',
-    required: false,
   })
-  @IsOptional()
   @IsEmail({}, { message: 'Please provide a valid email address' })
-  email?: string;
+  @MaxLength(255, { message: 'Email cannot exceed 255 characters' })
+  email: string;
 
   @ApiProperty({
-    description: 'Phone number (optional)',
+    description: 'Phone number (required)',
     example: '+1234567890',
-    required: false,
     maxLength: 20,
   })
-  @IsOptional()
-  @IsString()
+  @IsString({ message: 'Phone must be a string' })
   @MaxLength(20, { message: 'Phone cannot exceed 20 characters' })
-  phone?: string;
+  @Matches(/^[\+]?[\d\s\-\(\)]{7,20}$/, { message: 'Please provide a valid phone number' })
+  phone: string;
 
   @ApiProperty({
-    description: 'Photo URL (optional)',
-    example: 'https://example.com/photo.jpg',
+    description: 'Contact photo file (optional)',
+    type: 'string',
+    format: 'binary',
     required: false,
-    maxLength: 500,
   })
   @IsOptional()
-  @IsString()
-  @MaxLength(500, { message: 'Photo URL cannot exceed 500 characters' })
-  photo?: string;
+  photo?: Express.Multer.File;
 }
 
 export class UpdateContactDto extends CreateContactDto {

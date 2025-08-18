@@ -26,10 +26,7 @@ async function bootstrap() {
   // Global exception filter for consistent error responses
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  // Serve static files from uploads directory
-  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
-    prefix: '/uploads/',
-  });
+  // Static file serving removed - photos now stored as BLOB in database
 
   // Swagger configuration
   const config = new DocumentBuilder()
