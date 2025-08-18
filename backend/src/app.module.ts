@@ -7,6 +7,7 @@ import { databaseConfig } from './config/database.config';
 import { AuthModule } from './auth/auth.module';
 import { ContactsModule } from './contacts/contacts.module';
 import { UsersModule } from './users/users.module';
+import { EmailModule } from './email/email.module';
 
 
 @Module({
@@ -19,7 +20,7 @@ import { UsersModule } from './users/users.module';
     AuthModule,
     ContactsModule,
     UsersModule,
-
+    EmailModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -27,7 +27,6 @@ const Users = () => {
         setPagination(response.data.data.pagination);
       }
     } catch (err) {
-      console.error('Error fetching users:', err);
       setError(err.response?.data?.message || 'Failed to fetch users');
     } finally {
       setLoading(false);
@@ -44,14 +43,16 @@ const Users = () => {
 
   const handleAddUser = async (userData) => {
     try {
+      alert(`Adding new user: ${userData.name} (${userData.email})`);
       const response = await usersApi.createUser(userData);
       if (response.data.success) {
+        alert('User added successfully!');
         fetchUsers(); // Refresh the list
         return Promise.resolve();
       }
     } catch (err) {
       const errorMessage = err.response?.data?.message || 'Failed to create user';
-      console.error('Error creating user:', err);
+      alert(`Error: ${errorMessage}`);
       return Promise.reject(new Error(errorMessage));
     }
   };
@@ -60,14 +61,16 @@ const Users = () => {
     try {
       const response = await usersApi.deleteUser(userId);
       if (response.data.success) {
+        alert('User deleted successfully!');
         fetchUsers(); // Refresh the list
       }
     } catch (err) {
       const errorMessage = err.response?.data?.message || 'Failed to delete user';
-      console.error('Error deleting user:', err);
-      alert(errorMessage);
+      alert(`Error: ${errorMessage}`);
     }
   };
+
+
 
   if (loading && users.length === 0) {
     return (

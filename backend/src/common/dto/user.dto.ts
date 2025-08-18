@@ -69,6 +69,7 @@ export class CreateUserDto {
 
 
 
+// Pagination options for user queries
 export interface UserPaginationOptions {
   page: number;
   limit: number;
@@ -77,6 +78,7 @@ export interface UserPaginationOptions {
   sortOrder?: 'ASC' | 'DESC';
 }
 
+// Response structure for paginated users
 export interface PaginatedUsersResponse {
   users: any[];
   pagination: {

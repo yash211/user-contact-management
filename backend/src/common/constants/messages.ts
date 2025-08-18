@@ -1,4 +1,3 @@
-// User messages
 export const MESSAGES = {
   SUCCESS: {
     USER_REGISTERED: 'User registered successfully',

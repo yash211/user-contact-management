@@ -26,9 +26,9 @@ export class AuthService {
     private readonly jwtService: JwtService,
   ) {}
 
+  // Registers a new user and returns auth response
   async register(registerDto: RegisterDto): Promise<AuthResponse> {
     try {
-      // Check if email already exists
       const existingUser = await this.userRepository.findOne({
         where: { email: registerDto.email },
       });
@@ -37,7 +37,6 @@ export class AuthService {
         throw new ConflictException(MESSAGES.ERROR.USER_ALREADY_EXISTS);
       }
 
-      // Create and save user
       const user = this.userRepository.create({
         ...registerDto,
         role: registerDto.role || UserRole.USER,
@@ -51,15 +50,14 @@ export class AuthService {
         accessToken,
       };
     } catch (error) {
-      // Re-throw known exceptions
       if (error instanceof ConflictException) {
         throw error;
       }
-      // Handle unexpected errors
       throw new BadRequestException('Registration failed. Please try again.');
     }
   }
 
+  // Authenticates user login and returns auth response
   async login(loginDto: LoginDto): Promise<AuthResponse> {
     try {
       const user = await this.userRepository.findOne({
@@ -86,15 +84,14 @@ export class AuthService {
         accessToken,
       };
     } catch (error) {
-      // Re-throw known exceptions
       if (error instanceof NotFoundException || error instanceof UnauthorizedException) {
         throw error;
       }
-      // Handle unexpected errors
       throw new BadRequestException('Login failed. Please try again.');
     }
   }
 
+  // Finds a user by ID
   async findById(id: string): Promise<User> {
     try {
       const user = await this.userRepository.findOne({ where: { id } });
@@ -110,6 +107,7 @@ export class AuthService {
     }
   }
 
+  // Finds a user by email
   async findByEmail(email: string): Promise<User> {
     try {
       const user = await this.userRepository.findOne({ where: { email } });
@@ -125,10 +123,12 @@ export class AuthService {
     }
   }
 
+  // Finds a user by ID (alias for findById)
   async findUserById(id: string): Promise<User> {
     return this.findById(id);
   }
 
+  // Updates user photo
   async updateUserPhoto(userId: string, photoUrl: string | null): Promise<User> {
     try {
       const user = await this.findById(userId);
@@ -142,11 +142,11 @@ export class AuthService {
     }
   }
 
+  // Updates user profile information
   async updateUserProfile(userId: string, updateData: Partial<User>): Promise<User> {
     try {
       const user = await this.findById(userId);
       
-      // Update allowed fields
       if (updateData.name !== undefined) user.name = updateData.name;
       if (updateData.email !== undefined) user.email = updateData.email;
       if (updateData.phone !== undefined) user.phone = updateData.phone;
@@ -161,6 +161,7 @@ export class AuthService {
     }
   }
 
+  // Generates JWT token for user
   private generateToken(user: User): string {
     try {
       const payload: JwtPayload = {
@@ -177,6 +178,7 @@ export class AuthService {
     }
   }
 
+  // Removes password from user object
   private sanitizeUser(user: User): Partial<User> {
     const { password, ...sanitizedUser } = user;
     return sanitizedUser;

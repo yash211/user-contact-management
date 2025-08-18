@@ -63,15 +63,12 @@ const SignupForm = () => {
       
       //Checking response from server
       if (result.success && result.data && result.data.accessToken) {
-        console.log('Registration successful, setting token and dispatching success');
         tokenService.setToken(result.data.accessToken);
         dispatch(registerSuccess(result.data));
       } else {
-        console.error('Invalid response format:', result);
         throw new Error('Invalid response format from server');
       }
     } catch (error) {
-      console.error('Registration error:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Registration failed';
       dispatch(registerFailure(errorMessage));
     }

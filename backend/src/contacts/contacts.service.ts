@@ -5,6 +5,7 @@ import { Contact } from '../common/entities/contact.entity';
 import { CreateContactDto, UpdateContactDto } from '../common/dto/contact.dto';
 import { UserRole } from '../common/entities/user.entity';
 import { transformContactPhoto, transformContactsPhotos } from '../common/utils/photo.utils';
+import { EmailService } from '../email/email.service';
 
 export interface ContactPaginationOptions {
   page: number;
@@ -31,12 +32,13 @@ export class ContactsService {
   constructor(
     @InjectRepository(Contact)
     private readonly contactRepository: Repository<Contact>,
+    private readonly emailService: EmailService,
   ) {}
 
-  async createContact(createContactDto: CreateContactDto, userId: string, targetUserId?: string): Promise<Contact> {
+  // Creates a new contact and sends email notification
+  async createContact(createContactDto: CreateContactDto, userId: string, targetUserId?: string, userEmail?: string, userName?: string): Promise<Contact> {
     const contactUserId = targetUserId || userId;
     
-    // Convert photo file to buffer if provided
     const photoData = createContactDto.photo && 'buffer' in createContactDto.photo 
       ? createContactDto.photo.buffer 
       : null;
@@ -50,11 +52,19 @@ export class ContactsService {
     });
     
     const savedContact = await this.contactRepository.save(contact);
-    // Temporarily disable photo transformation to debug the issue
-    // return transformContactPhoto(savedContact);
+    
+    if (userEmail && userName) {
+      try {
+        await this.emailService.sendContactCreatedEmail(savedContact, userEmail, userName);
+      } catch (error) {
+        console.error('Failed to send contact creation email:', error);
+      }
+    }
+    
     return savedContact;
   }
 
+  // Retrieves paginated contacts with search and sorting
   async findAllContacts(
     userId: string,
     options: ContactPaginationOptions,
@@ -94,7 +104,6 @@ export class ContactsService {
 
       const contacts = await queryBuilder.getMany();
 
-      // Transform photo data for API response
       const transformedContacts = transformContactsPhotos(contacts);
 
       const totalPages = Math.ceil(total / limit);
@@ -118,6 +127,7 @@ export class ContactsService {
     }
   }
 
+  // Finds a contact by ID for a specific user
   async findContactById(id: string, userId: string, targetUserId?: string): Promise<Contact> {
     const contact = await this.contactRepository.findOne({
       where: { id, userId: targetUserId || userId },
@@ -127,11 +137,10 @@ export class ContactsService {
       throw new NotFoundException('Contact not found');
     }
 
-    // Temporarily disable photo transformation to debug the issue
-    // return transformContactPhoto(contact);
     return contact;
   }
 
+  // Updates a contact with new data
   async updateContact(
     id: string,
     updateContactDto: UpdateContactDto,
@@ -140,33 +149,12 @@ export class ContactsService {
   ): Promise<Contact> {
     const contact = await this.findContactById(id, userId, targetUserId);
     
-    console.log('Update Contact - Existing photo before update:', !!contact.photo);
-    console.log('Update Contact - DTO photo provided:', !!updateContactDto.photo);
-    console.log('Update Contact - DTO photo type:', typeof updateContactDto.photo);
-    console.log('Update Contact - DTO photo starts with data:image:', updateContactDto.photo && typeof updateContactDto.photo === 'string' ? (updateContactDto.photo as string).startsWith('data:image/') : 'N/A');
-    
-    // Convert photo file to buffer if provided, otherwise preserve existing photo
     if (updateContactDto.photo && 'buffer' in updateContactDto.photo) {
-      // New photo file uploaded
       contact.photo = updateContactDto.photo.buffer;
-      console.log('Update Contact - New photo set');
-    } else if (updateContactDto.photo && typeof updateContactDto.photo === 'string' && (updateContactDto.photo as string).startsWith('data:image/')) {
-      // Existing photo data sent from frontend - preserve it
-      console.log('Update Contact - Existing photo data received, preserving');
-      // Don't change contact.photo - keep the existing buffer
-    } else if (updateContactDto.photo === undefined || updateContactDto.photo === null) {
-      console.log('Update Contact - No photo provided, preserving existing photo');
-      // Explicitly don't change contact.photo - keep the existing buffer
-    } else {
-      console.log('Update Contact - Unexpected photo type, preserving existing photo');
-      console.log('Update Contact - Photo data type:', typeof updateContactDto.photo);
-      // Don't change contact.photo - keep the existing buffer
     }
     
-    // Create an update object with only the fields that should be updated
     const updateData: Partial<Contact> = {};
     
-    // Update other fields only if provided
     if (updateContactDto.name !== undefined) {
       contact.name = updateContactDto.name;
       updateData.name = updateContactDto.name;
@@ -180,7 +168,6 @@ export class ContactsService {
       updateData.phone = updateContactDto.phone;
     }
     
-    // Only update photo if a new one was provided (not undefined, not null)
     if (updateContactDto.photo && 'buffer' in updateContactDto.photo) {
       contact.photo = updateContactDto.photo.buffer;
       updateData.photo = updateContactDto.photo.buffer;
@@ -190,24 +177,19 @@ export class ContactsService {
     console.log('Update Contact - Photo after field updates:', !!contact.photo);
     console.log('Update Contact - Fields being updated:', Object.keys(updateData));
     
-    // Use update instead of save to avoid updating fields we don't want to change
     await this.contactRepository.update(contact.id, updateData);
     
-    // Return the updated contact
     const savedContact = await this.findContactById(contact.id, userId, targetUserId);
-    console.log('Update Contact - Photo after save:', !!savedContact.photo);
-    
-    // Temporarily disable photo transformation to debug the issue
-    // return transformContactPhoto(savedContact);
     return savedContact;
   }
 
+  // Deletes a contact by ID
   async deleteContact(id: string, userId: string, targetUserId?: string): Promise<void> {
     const contact = await this.findContactById(id, userId, targetUserId);
     await this.contactRepository.remove(contact);
   }
 
-  // admin can see all contacts across users
+  // Retrieves all contacts for admin users across all users
   async findAllContactsForAdmin(
     options: ContactPaginationOptions,
   ): Promise<PaginatedContactsResponse> {
@@ -242,7 +224,6 @@ export class ContactsService {
 
     const contacts = await queryBuilder.getMany();
 
-    // Transform photo data for API response
     const transformedContacts = transformContactsPhotos(contacts);
 
     const totalPages = Math.ceil(total / limit);
@@ -262,11 +243,11 @@ export class ContactsService {
     };
   }
 
+  // Exports contacts to CSV format
   async exportContactsToCsv(userId: string, targetUserId?: string, options?: { search?: string; sortBy?: string; sortOrder?: 'ASC' | 'DESC'; isAdmin?: boolean }): Promise<{ contacts: any[], headers: string[] }> {
     let queryBuilder: SelectQueryBuilder<Contact> = this.contactRepository
       .createQueryBuilder('contact');
 
-    // Only join user table if admin is exporting
     if (options?.isAdmin) {
       queryBuilder = queryBuilder
         .leftJoinAndSelect('contact.user', 'user')
@@ -279,7 +260,6 @@ export class ContactsService {
       queryBuilder = queryBuilder.where('contact.userId = :userId', { userId });
     }
 
-    // Apply search filter
     if (options?.search) {
       queryBuilder = queryBuilder.andWhere(
         '(contact.name ILIKE :search OR contact.email ILIKE :search OR contact.phone ILIKE :search)',
@@ -287,7 +267,6 @@ export class ContactsService {
       );
     }
 
-    // Apply sorting
     if (options?.sortBy && options?.sortOrder) {
       queryBuilder = queryBuilder.orderBy(`contact.${options.sortBy}`, options.sortOrder);
     } else {
@@ -296,9 +275,6 @@ export class ContactsService {
 
     const contacts = await queryBuilder.getMany();
 
-    // Transform photo data before processing
-    // Temporarily disable photo transformation to debug the issue
-    // const transformedContacts = transformContactsPhotos(contacts);
     const transformedContacts = contacts;
 
     const headers = options?.isAdmin ? ['Name', 'Email', 'Phone', 'User Associated With'] : ['Name', 'Email', 'Phone'];
@@ -319,13 +295,13 @@ export class ContactsService {
     return { contacts: records, headers };
   }
 
+  // Exports all contacts to CSV format for admin users
   async exportAllContactsToCsv(options?: { search?: string; sortBy?: string; sortOrder?: 'ASC' | 'DESC' }): Promise<{ contacts: any[], headers: string[] }> {
     let queryBuilder = this.contactRepository
       .createQueryBuilder('contact')
       .leftJoinAndSelect('contact.user', 'user')
       .addSelect(['user.id', 'user.name', 'user.email']);
 
-    // Apply search filter
     if (options?.search) {
       queryBuilder = queryBuilder.andWhere(
         '(contact.name ILIKE :search OR contact.email ILIKE :search OR contact.phone ILIKE :search)',
@@ -333,7 +309,6 @@ export class ContactsService {
       );
     }
 
-    // Apply sorting
     if (options?.sortBy && options?.sortOrder) {
       queryBuilder = queryBuilder.orderBy(`contact.${options.sortBy}`, options.sortOrder);
     } else {
@@ -342,9 +317,6 @@ export class ContactsService {
 
     const contacts = await queryBuilder.getMany();
 
-    // Transform photo data before processing
-    // Temporarily disable photo transformation to debug the issue
-    // const transformedContacts = transformContactsPhotos(contacts);
     const transformedContacts = contacts;
 
     const headers = ['Name', 'Email', 'Phone', 'User Associated With'];

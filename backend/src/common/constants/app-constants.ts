@@ -1,4 +1,3 @@
-// App configuration
 export const APP_CONSTANTS = {
   JWT: {
     EXPIRES_IN: '24h',
@@ -8,7 +7,7 @@ export const APP_CONSTANTS = {
     SALT_ROUNDS: 12,
   },
   USER: {
-    DEFAULT_ROLE: 'user', // String literal to avoid circular import
+    DEFAULT_ROLE: 'user',
     MIN_NAME_LENGTH: 2,
     MAX_NAME_LENGTH: 100,
   },

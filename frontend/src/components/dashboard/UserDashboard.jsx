@@ -63,9 +63,7 @@ const UserDashboard = () => {
         sortOrder: sortOrder
       };
       
-      console.log('Fetching contacts with params:', params);
-      
-             // Use admin endpoint if user is admin
+      // Use admin endpoint if user is admin
        const response = user?.role === 'admin' 
          ? await contactsApi.getAllContactsForAdmin(params)
          : await contactsApi.getContacts(params);
@@ -74,18 +72,12 @@ const UserDashboard = () => {
         const contactsData = response.data.data.contacts || [];
         const paginationData = response.data.data.pagination;
         
-        console.log('Received contacts:', contactsData.length, 'contacts');
-        console.log('First contact sample:', contactsData[0]);
-        
         // Process contacts - photos are now base64 data URLs from backend
         const contactsWithPhotos = contactsData.map((contact) => ({
           ...contact,
           photo: contact.photo || null
         }));
         
-        console.log('Setting contacts in state:', contactsWithPhotos.length);
-        console.log('First contact after processing:', contactsWithPhotos[0]);
-        console.log('First contact photo exists:', !!contactsWithPhotos[0]?.photo);
         setContacts(contactsWithPhotos);
         setTotalContacts(paginationData?.total || contactsData.length);
       } else {
@@ -127,6 +119,7 @@ const UserDashboard = () => {
   };
 
   const handleAddContact = () => {
+    alert('Opening Add Contact form...');
     setIsAddModalOpen(true);
   };
 
@@ -135,6 +128,7 @@ const UserDashboard = () => {
   };
 
   const handleEditContact = (contact) => {
+    alert(`Opening Edit Contact form for: ${contact.name} (${contact.email})`);
     setEditingContact(contact);
     setIsEditModalOpen(true);
   };
@@ -146,19 +140,11 @@ const UserDashboard = () => {
 
   const handleDeleteContact = async (contactId) => {
     try {
-      console.log('Deleting contact:', contactId);
-      
       // Find the contact to get the targetUserId for admin users
       const contact = contacts.find(c => c.id === contactId);
       const targetUserId = user?.role === 'admin' && contact?.userId ? contact.userId : null;
       
-      console.log('Delete - Contact found:', contact);
-      console.log('Delete - Target user ID:', targetUserId);
-      
       const response = await contactsApi.deleteContact(contactId, targetUserId);
-      
-      console.log('Delete response:', response);
-      console.log('Delete response data:', response.data);
       
       // Handle successful delete (either 200 with success data or 204 no content)
       if (response.status === 204 || (response.data && response.data.success)) {
@@ -166,17 +152,11 @@ const UserDashboard = () => {
         fetchContacts();
         
         // Show success message
-        console.log('Contact deleted successfully');
         alert('Contact deleted successfully!');
       } else {
-        console.error('Delete failed - response:', response);
         throw new Error(response.data?.message || 'Failed to delete contact');
       }
     } catch (error) {
-      console.error('Delete failed:', error);
-      console.error('Error response:', error.response);
-      console.error('Error response data:', error.response?.data);
-      
       const errorMessage = error.response?.data?.message || error.message || 'Failed to delete contact';
       alert(`Delete failed: ${errorMessage}`);
     }
@@ -185,6 +165,8 @@ const UserDashboard = () => {
     const handleSubmitAddContact = async (contactData) => {
     try {
       setIsAddingContact(true);
+      
+      alert(`Adding new contact: ${contactData.name} (${contactData.email})`);
       
       // contactData now contains the photo file directly
       const response = await contactsApi.createContact(contactData);
@@ -195,20 +177,21 @@ const UserDashboard = () => {
         setCurrentPage(1); // Reset to first page
         fetchContacts();
         
-                // Show success message (you can add a toast notification here)
+        alert('Contact added successfully! An email notification has been sent to your registered email address.');
         return true; // Return success
             } else {
         // Handle validation errors from backend
         if (response.data.message && Array.isArray(response.data.message)) {
-          console.error('Validation errors:', response.data.message);
+          // Validation errors handled silently
         }
         throw new Error(response.data.message || 'Failed to add contact');
       }
     } catch (err) {
       // Handle network errors
       if (err.response?.data?.message) {
-        console.error('Backend error:', err.response.data.message);
+        // Backend error handled silently
       }
+      alert(`Error: ${err.response?.data?.message || err.message || 'Failed to add contact'}`);
       throw err; // Re-throw to trigger form reset
    } finally {
       setIsAddingContact(false);
@@ -219,25 +202,17 @@ const UserDashboard = () => {
     try {
       setIsUpdatingContact(true);
       
-      console.log('Updating contact:', contactId, contactData);
+      const contact = contacts.find(c => c.id === contactId);
+      alert(`Updating contact: ${contact?.name} (${contact?.email})`);
       
       // Find the contact to get the targetUserId for admin users
-      const contact = contacts.find(c => c.id === contactId);
       const targetUserId = user?.role === 'admin' && contact?.userId ? contact.userId : null;
-      
-      console.log('Edit - Contact found:', contact);
-      console.log('Edit - Target user ID:', targetUserId);
       
       const response = await contactsApi.updateContact(contactId, contactData, targetUserId);
       
       if (response.data.success) {
-        console.log('Update response:', response.data);
-        console.log('Response data structure:', JSON.stringify(response.data, null, 2));
-        
         // Update the contact in local state immediately
         const updatedContact = response.data.data.contact;
-        console.log('Extracted updated contact:', updatedContact);
-        console.log('Updated contact photo:', !!updatedContact?.photo);
         
         if (updatedContact) {
           setContacts(prevContacts => 
@@ -248,24 +223,24 @@ const UserDashboard = () => {
         }
         
         // Also refresh contacts list to ensure consistency
-        console.log('Refreshing contacts list...');
         await fetchContacts();
         
         // Show success message
-        console.log('Contact updated successfully');
+        alert('Contact updated successfully!');
         return true;
       } else {
         // Handle validation errors from backend
         if (response.data.message && Array.isArray(response.data.message)) {
-          console.error('Validation errors:', response.data.message);
+          // Validation errors handled silently
         }
         throw new Error(response.data.message || 'Failed to update contact');
       }
     } catch (err) {
       // Handle network errors
       if (err.response?.data?.message) {
-        console.error('Backend error:', err.response.data.message);
+        // Backend error handled silently
       }
+      alert(`Error: ${err.response?.data?.message || err.message || 'Failed to update contact'}`);
       throw err;
     } finally {
       setIsUpdatingContact(false);
@@ -303,10 +278,8 @@ const UserDashboard = () => {
       window.URL.revokeObjectURL(url);
       
       // Show success message
-      console.log('Export completed successfully');
       
     } catch (error) {
-      console.error('Export failed:', error);
       
       // More specific error messages
       let errorMessage = 'Export failed. Please try again.';

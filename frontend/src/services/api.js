@@ -51,7 +51,7 @@ const contactsApi = {
   createContact: (contactData) => {
     const formData = new FormData();
     Object.keys(contactData).forEach(key => {
-      if (contactData[key] !== null && contactData[key] !== undefined) {
+      if (contactData[key] !== null && contactData[key] !== undefined && contactData[key] !== '') {
         formData.append(key, contactData[key]);
       }
     });
@@ -66,11 +66,16 @@ const contactsApi = {
     if (targetUserId) { params.userId = targetUserId; }
     const formData = new FormData();
     Object.keys(contactData).forEach(key => {
-      if (contactData[key] !== null && contactData[key] !== undefined) {
+      if (contactData[key] !== null && contactData[key] !== undefined && contactData[key] !== '') {
         formData.append(key, contactData[key]);
       }
     });
-    return api.put(`/contacts/${id}`, formData, { params });
+    return api.put(`/contacts/${id}`, formData, { 
+      params,
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
   },
   deleteContact: (id, targetUserId = null) => {
     const params = {};

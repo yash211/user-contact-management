@@ -49,6 +49,7 @@ export class User {
   @OneToMany(() => Contact, contact => contact.user)
   contacts: Contact[];
 
+  // Hashes password before insert/update
   @BeforeInsert()
   @BeforeUpdate()
   async hashPassword() {
@@ -57,6 +58,7 @@ export class User {
     }
   }
 
+  // Validates password against stored hash
   async validatePassword(password: string): Promise<boolean> {
     return bcrypt.compare(password, this.password);
   }
