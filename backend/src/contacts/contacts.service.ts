@@ -5,6 +5,7 @@ import { Contact } from '../common/entities/contact.entity';
 import { CreateContactDto, UpdateContactDto } from '../common/dto/contact.dto';
 import { UserRole } from '../common/entities/user.entity';
 import { transformContactPhoto, transformContactsPhotos } from '../common/utils/photo.utils';
+import { EmailService } from '../email/email.service';
 
 export interface ContactPaginationOptions {
   page: number;
@@ -31,9 +32,10 @@ export class ContactsService {
   constructor(
     @InjectRepository(Contact)
     private readonly contactRepository: Repository<Contact>,
+    private readonly emailService: EmailService,
   ) {}
 
-  async createContact(createContactDto: CreateContactDto, userId: string, targetUserId?: string): Promise<Contact> {
+  async createContact(createContactDto: CreateContactDto, userId: string, targetUserId?: string, userEmail?: string, userName?: string): Promise<Contact> {
     const contactUserId = targetUserId || userId;
     
     // Convert photo file to buffer if provided
@@ -50,6 +52,17 @@ export class ContactsService {
     });
     
     const savedContact = await this.contactRepository.save(contact);
+    
+    // Send email notification if user email and name are provided
+    if (userEmail && userName) {
+      try {
+        await this.emailService.sendContactCreatedEmail(savedContact, userEmail, userName);
+      } catch (error) {
+        console.error('Failed to send contact creation email:', error);
+        // Don't throw error to avoid breaking the contact creation flow
+      }
+    }
+    
     // Temporarily disable photo transformation to debug the issue
     // return transformContactPhoto(savedContact);
     return savedContact;

@@ -199,7 +199,7 @@ const UserDashboard = () => {
         setCurrentPage(1); // Reset to first page
         fetchContacts();
         
-        alert('Contact added successfully!');
+        alert('Contact added successfully! An email notification has been sent to your registered email address.');
         return true; // Return success
             } else {
         // Handle validation errors from backend

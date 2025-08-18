@@ -156,6 +156,8 @@ export class ContactsController {
         createContactDto,
         req.user.id,
         contactUserId,
+        req.user.email,
+        req.user.name,
       );
       
       return ResponseBuilder.success(
